@@ -14,10 +14,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Restore CALLCONSOLE from uploaded project ZIP
+      - name: Prepare CALLCONSOLE web app
         run: |
-          if [ -f CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip ]; then
-            rm -rf /tmp/callconsole
+          # Preferred source: app files committed directly to www/
+          if [ -f www/index.html ]; then
+            echo "Using CALLCONSOLE files committed directly to www/"
+          elif [ -f CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip ]; then
+            echo "No direct www/index.html found; restoring from project ZIP"
+            rm -rf /tmp/callconsole www
             mkdir -p /tmp/callconsole
             unzip -q CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip -d /tmp/callconsole
             SOURCE_DIR="$(find /tmp/callconsole -type f -path '*/www/index.html' -print -quit | xargs dirname)"
@@ -25,8 +29,10 @@ jobs:
               echo "Could not find www/index.html inside CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip"
               exit 1
             fi
-            rm -rf www
             cp -R "$SOURCE_DIR" www
+          else
+            echo "No CALLCONSOLE web app source found."
+            exit 1
           fi
           test -f www/index.html
 
