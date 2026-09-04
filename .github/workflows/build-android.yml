@@ -14,6 +14,22 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Restore CALLCONSOLE from uploaded project ZIP
+        run: |
+          if [ -f CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip ]; then
+            rm -rf /tmp/callconsole
+            mkdir -p /tmp/callconsole
+            unzip -q CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip -d /tmp/callconsole
+            SOURCE_DIR="$(find /tmp/callconsole -type f -path '*/www/index.html' -print -quit | xargs dirname)"
+            if [ -z "$SOURCE_DIR" ]; then
+              echo "Could not find www/index.html inside CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip"
+              exit 1
+            fi
+            rm -rf www
+            cp -R "$SOURCE_DIR" www
+          fi
+          test -f www/index.html
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -25,10 +41,6 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-
-      - name: Validate web application
-        run: |
-          test -f www/index.html
 
       - name: Install dependencies
         run: npm install
