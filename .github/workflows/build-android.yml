@@ -14,8 +14,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Restore CALLCONSOLE source from baseline project
+      - name: Preserve AI engine and restore baseline app
         run: |
+          cp www/ai-engine.js /tmp/callconsole-ai-engine.js
           rm -rf /tmp/callconsole www
           mkdir -p /tmp/callconsole
           unzip -q CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip -d /tmp/callconsole
@@ -25,12 +26,12 @@ jobs:
             exit 1
           fi
           cp -R "$SOURCE_DIR" www
+          cp /tmp/callconsole-ai-engine.js www/ai-engine.js
           test -f www/index.html
+          test -f www/ai-engine.js
 
       - name: Apply CALLCONSOLE AI intelligence layer
         run: |
-          cp www/ai-engine.js /tmp/ai-engine-existing.js 2>/dev/null || true
-          cp www/../ai-engine.js www/ai-engine.js 2>/dev/null || cp www/ai-engine.js www/ai-engine.js
           python3 - <<'PY'
           from pathlib import Path
           p = Path('www/index.html')
@@ -71,8 +72,7 @@ async function coachNextMove(){
           s = s.replace(marker, inject + marker, 1)
           p.write_text(s, encoding='utf-8')
           PY
-          cp www/ai-engine.js /tmp/ai-engine-check.js
-          node --check /tmp/ai-engine-check.js
+          node --check www/ai-engine.js
           grep -q 'function coachNextMoveLocal' www/index.html
           grep -q 'function coachNextMove()' www/index.html
           grep -q 'CALLCONSOLE_AI.nextMove' www/index.html
