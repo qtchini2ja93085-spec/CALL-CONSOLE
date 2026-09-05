@@ -14,27 +14,68 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Prepare CALLCONSOLE web app
+      - name: Restore CALLCONSOLE source from baseline project
         run: |
-          # Preferred source: app files committed directly to www/
-          if [ -f www/index.html ]; then
-            echo "Using CALLCONSOLE files committed directly to www/"
-          elif [ -f CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip ]; then
-            echo "No direct www/index.html found; restoring from project ZIP"
-            rm -rf /tmp/callconsole www
-            mkdir -p /tmp/callconsole
-            unzip -q CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip -d /tmp/callconsole
-            SOURCE_DIR="$(find /tmp/callconsole -type f -path '*/www/index.html' -print -quit | xargs dirname)"
-            if [ -z "$SOURCE_DIR" ]; then
-              echo "Could not find www/index.html inside CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip"
-              exit 1
-            fi
-            cp -R "$SOURCE_DIR" www
-          else
-            echo "No CALLCONSOLE web app source found."
+          rm -rf /tmp/callconsole www
+          mkdir -p /tmp/callconsole
+          unzip -q CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip -d /tmp/callconsole
+          SOURCE_DIR="$(find /tmp/callconsole -type f -path '*/www/index.html' -print -quit | xargs dirname)"
+          if [ -z "$SOURCE_DIR" ]; then
+            echo "Could not find www/index.html inside project ZIP"
             exit 1
           fi
+          cp -R "$SOURCE_DIR" www
           test -f www/index.html
+
+      - name: Apply CALLCONSOLE AI intelligence layer
+        run: |
+          cp www/ai-engine.js /tmp/ai-engine-existing.js 2>/dev/null || true
+          cp www/../ai-engine.js www/ai-engine.js 2>/dev/null || cp www/ai-engine.js www/ai-engine.js
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('www/index.html')
+          s = p.read_text(encoding='utf-8')
+          old = 'function coachNextMove(){'
+          new = 'function coachNextMoveLocal(){'
+          if old not in s:
+              raise SystemExit('Expected CALLCONSOLE coach function was not found')
+          s = s.replace(old, new, 1)
+          marker = '<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
+          inject = r'''<script src="./ai-engine.js"></script>
+<script>
+// AI-enhanced coach wrapper. The existing offline coach remains the safe fallback.
+async function coachNextMove(){
+    const input = document.getElementById("live-coach-input");
+    const text = input ? input.value.trim() : "";
+    if(!text){ showStatus("⚡ Enter what the prospect said first."); return; }
+    const research = ((document.getElementById("f-research")||{}).value || "");
+    const role = ((document.getElementById("f-role")||{}).value || "the team").trim();
+    const company = ((document.getElementById("f-company")||{}).value || "").trim();
+    const prospect = ((document.getElementById("f-prospect")||{}).value || "").trim();
+    const product = ((document.getElementById("f-product")||{}).value || "Jedox").trim();
+    const result = await window.CALLCONSOLE_AI.nextMove({
+        prospect, company, role, product, research,
+        prospectSaid: text,
+        localFallback: () => window.CALLCONSOLE_AI.localNextMove({prospect,company,role,product,research,prospectSaid:text})
+    });
+    const rEl=document.getElementById("live-coach-response"); if(rEl) rEl.textContent=result.response;
+    const qEl=document.getElementById("live-coach-question"); if(qEl) qEl.textContent=result.question;
+    const resEl=document.getElementById("live-coach-result"); if(resEl) resEl.classList.add("open");
+    if(result.source === "openai") showStatus("🧠 AI coaching applied.");
+}
+</script>
+
+'''
+          if marker not in s:
+              raise SystemExit('Expected injection marker was not found')
+          s = s.replace(marker, inject + marker, 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          cp www/ai-engine.js /tmp/ai-engine-check.js
+          node --check /tmp/ai-engine-check.js
+          grep -q 'function coachNextMoveLocal' www/index.html
+          grep -q 'function coachNextMove()' www/index.html
+          grep -q 'CALLCONSOLE_AI.nextMove' www/index.html
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
