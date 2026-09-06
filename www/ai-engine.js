@@ -1,16 +1,13 @@
 /* CALLCONSOLE AI Intelligence Layer
- * Uses the Intelligent Outreach Builder-style reasoning pattern while preserving
+ * Uses the Intelligent Outreach Builder intelligence service while preserving
  * CALLCONSOLE's existing UI and offline workflow.
- *
- * Online mode: POSTs structured call context to /api/ai (or a configured endpoint).
- * Offline mode: uses the existing CALLCONSOLE coach logic as a deterministic fallback.
  */
 (function(){
   "use strict";
 
   const cfg = window.CALLCONSOLE_AI_CONFIG || {};
-  const endpoint = cfg.endpoint || (location.protocol === "http:" || location.protocol === "https:" ? "/api/ai" : "");
-  const timeoutMs = Number(cfg.timeoutMs || 7000);
+  const endpoint = cfg.endpoint || "https://intelligent-outreach-builder.vercel.app/api/callconsole-ai";
+  const timeoutMs = Number(cfg.timeoutMs || 10000);
 
   function clean(v){ return String(v || "").replace(/\s+/g," ").trim(); }
   function systemsFrom(text){
@@ -36,7 +33,6 @@
     if(!/pain|challenge|manual|spreadsheet|limitation|problem|issue/.test(all)) out.push("business pain/priority");
     return out;
   }
-
   function localNextMove(ctx){
     const text=clean(ctx.prospectSaid).toLowerCase();
     const role=clean(ctx.role)||"the team";
@@ -67,38 +63,19 @@
     }
     return {response,question,signals:signals(ctx.prospectSaid),qualificationGaps:gaps(ctx),systems,source:"offline"};
   }
-
   async function nextMove(ctx){
     const fallback=ctx.localFallback ? ctx.localFallback() : localNextMove(ctx);
     if(!endpoint) return fallback;
     const controller=new AbortController();
     const timer=setTimeout(()=>controller.abort(),timeoutMs);
     try{
-      const payload={
-        task:"live_call_coaching",
-        context:{
-          prospect:clean(ctx.prospect), company:clean(ctx.company), role:clean(ctx.role),
-          product:clean(ctx.product), research:clean(ctx.research), prospectSaid:clean(ctx.prospectSaid)
-        }
-      };
-      const res=await fetch(endpoint,{
-        method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify(payload), signal:controller.signal
-      });
+      const payload={task:"live_call_coaching",prospect:clean(ctx.prospect),company:clean(ctx.company),role:clean(ctx.role),product:clean(ctx.product),research:clean(ctx.research),prospectSaid:clean(ctx.prospectSaid)};
+      const res=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),signal:controller.signal});
       if(!res.ok) throw new Error("AI endpoint "+res.status);
       const data=await res.json();
       if(!data || !clean(data.response) || !clean(data.question)) throw new Error("Invalid AI response");
-      return {
-        response:clean(data.response), question:clean(data.question),
-        signals:data.signals || signals(ctx.prospectSaid),
-        qualificationGaps:Array.isArray(data.qualificationGaps)?data.qualificationGaps:gaps(ctx),
-        systems:Array.isArray(data.systems)?data.systems:systemsFrom(ctx.research),
-        source:"openai"
-      };
-    }catch(e){
-      return fallback;
-    }finally{ clearTimeout(timer); }
+      return {response:clean(data.response),question:clean(data.question),signals:data.signals||signals(ctx.prospectSaid),qualificationGaps:Array.isArray(data.qualificationGaps)?data.qualificationGaps:gaps(ctx),systems:Array.isArray(data.systems)?data.systems:systemsFrom(ctx.research),source:data.source||"gemini"};
+    }catch(e){ return fallback; } finally{ clearTimeout(timer); }
   }
-
   window.CALLCONSOLE_AI={nextMove,localNextMove};
 })();
