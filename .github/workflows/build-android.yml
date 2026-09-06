@@ -74,6 +74,38 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Smoke test live CALLCONSOLE AI endpoint
+        run: |
+          node - <<'NODE'
+          const endpoint = 'https://intelligent-outreach-builder.vercel.app/api/callconsole-ai';
+          const payload = {
+            prospect: 'Smoke Test Prospect',
+            company: 'Smoke Test Co',
+            role: 'CFO',
+            product: 'Jedox',
+            research: 'Test-only validation request. Do not invent facts.',
+            prospectSaid: 'We are interested, but we need to understand the timing.'
+          };
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 20000);
+          try {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+              signal: controller.signal
+            });
+            const text = await response.text();
+            if (!response.ok) throw new Error(`HTTP ${response.status}: ${text}`);
+            const data = JSON.parse(text);
+            if (!data.response || !data.question) throw new Error('AI endpoint returned no response/question');
+            if (data.source === 'fallback') throw new Error('AI endpoint is reachable but Gemini-backed intelligence is not active (fallback returned)');
+            console.log('CALLCONSOLE AI smoke test passed:', JSON.stringify({ source: data.source }));
+          } finally {
+            clearTimeout(timer);
+          }
+          NODE
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
