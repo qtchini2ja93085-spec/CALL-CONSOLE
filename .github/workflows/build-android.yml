@@ -14,63 +14,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Preserve AI engine and restore baseline app
+      - name: Restore known-good CALLCONSOLE baseline
         run: |
-          cp www/ai-engine.js /tmp/callconsole-ai-engine.js
+          set -e
           rm -rf /tmp/callconsole www
           mkdir -p /tmp/callconsole
           unzip -q CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip -d /tmp/callconsole
           SOURCE_DIR="$(find /tmp/callconsole -type f -path '*/www/index.html' -print -quit | xargs dirname)"
-          if [ -z "$SOURCE_DIR" ]; then
-            echo "Could not find www/index.html inside project ZIP"
-            exit 1
-          fi
+          test -n "$SOURCE_DIR"
           cp -R "$SOURCE_DIR" www
-          cp /tmp/callconsole-ai-engine.js www/ai-engine.js
           test -f www/index.html
-          test -f www/ai-engine.js
 
-      - name: Apply CALLCONSOLE AI intelligence layer
+      - name: Apply AI engine and CALLCONSOLE coach integration
         run: |
+          set -e
+          test -f build-assets/callconsole-ai-engine.js
+          cp build-assets/callconsole-ai-engine.js www/ai-engine.js
           python3 - <<'PY'
           from pathlib import Path
           p = Path('www/index.html')
           s = p.read_text(encoding='utf-8')
           old = 'function coachNextMove(){'
-          new = 'function coachNextMoveLocal(){'
           if old not in s:
               raise SystemExit('Expected CALLCONSOLE coach function was not found')
-          s = s.replace(old, new, 1)
+          s = s.replace(old, 'function coachNextMoveLocal(){', 1)
           marker = '<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
-          inject = r'''<script src="./ai-engine.js"></script>
-<script>
-// AI-enhanced coach wrapper. The existing offline coach remains the safe fallback.
-async function coachNextMove(){
-    const input = document.getElementById("live-coach-input");
-    const text = input ? input.value.trim() : "";
-    if(!text){ showStatus("⚡ Enter what the prospect said first."); return; }
-    const research = ((document.getElementById("f-research")||{}).value || "");
-    const role = ((document.getElementById("f-role")||{}).value || "the team").trim();
-    const company = ((document.getElementById("f-company")||{}).value || "").trim();
-    const prospect = ((document.getElementById("f-prospect")||{}).value || "").trim();
-    const product = ((document.getElementById("f-product")||{}).value || "Jedox").trim();
-    const result = await window.CALLCONSOLE_AI.nextMove({
-        prospect, company, role, product, research,
-        prospectSaid: text,
-        localFallback: () => window.CALLCONSOLE_AI.localNextMove({prospect,company,role,product,research,prospectSaid:text})
-    });
-    const rEl=document.getElementById("live-coach-response"); if(rEl) rEl.textContent=result.response;
-    const qEl=document.getElementById("live-coach-question"); if(qEl) qEl.textContent=result.question;
-    const resEl=document.getElementById("live-coach-result"); if(resEl) resEl.classList.add("open");
-    if(result.source === "openai") showStatus("🧠 AI coaching applied.");
-}
-</script>
-
-'''
           if marker not in s:
-              raise SystemExit('Expected injection marker was not found')
-          s = s.replace(marker, inject + marker, 1)
-          p.write_text(s, encoding='utf-8')
+              raise SystemExit('Expected CALLCONSOLE injection marker was not found')
+          inject = '''<script src="./ai-engine.js"></script>\n<script>\nasync function coachNextMove(){\n    const input=document.getElementById("live-coach-input");\n    const text=input?input.value.trim():"";\n    if(!text){showStatus("⚡ Enter what the prospect said first.");return;}\n    const research=((document.getElementById("f-research")||{}).value||"");\n    const role=((document.getElementById("f-role")||{}).value||"the team").trim();\n    const company=((document.getElementById("f-company")||{}).value||"").trim();\n    const prospect=((document.getElementById("f-prospect")||{}).value||"").trim();\n    const product=((document.getElementById("f-product")||{}).value||"Jedox").trim();\n    const ctx={prospect,company,role,product,research,prospectSaid:text};\n    const result=await window.CALLCONSOLE_AI.nextMove({...ctx,localFallback:()=>window.CALLCONSOLE_AI.localNextMove(ctx)});\n    const rEl=document.getElementById("live-coach-response");if(rEl)rEl.textContent=result.response;\n    const qEl=document.getElementById("live-coach-question");if(qEl)qEl.textContent=result.question;\n    const resEl=document.getElementById("live-coach-result");if(resEl)resEl.classList.add("open");\n    showStatus(result.source==="gemini"?"🧠 AI coaching applied.":"⚡ Offline coaching applied.");\n}\n</script>\n\n'''
+          s=s.replace(marker,inject+marker,1)
+          p.write_text(s,encoding='utf-8')
           PY
           node --check www/ai-engine.js
           grep -q 'function coachNextMoveLocal' www/index.html
@@ -81,12 +54,14 @@ async function coachNextMove(){
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
 
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
+          cache: gradle
 
       - name: Install dependencies
         run: npm install
