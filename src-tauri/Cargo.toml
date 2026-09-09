@@ -1,0 +1,17 @@
+[package]
+name = "callconsole"
+version = "1.0.0"
+description = "CALLCONSOLE Windows desktop app"
+authors = ["EPM Solutions"]
+edition = "2021"
+license = "UNLICENSED"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
