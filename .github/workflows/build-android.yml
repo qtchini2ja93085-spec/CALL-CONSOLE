@@ -1,6 +1,6 @@
 name: Build CALLCONSOLE Android APK
 
-# Rebuild after backend AI timeout hardening so the production smoke test validates the new provider behavior.
+# Validate the bounded AERO AI v2 backend after Gemini tailoring timeout investigation.
 on:
   workflow_dispatch:
   push:
