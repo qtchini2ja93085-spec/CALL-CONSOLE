@@ -52,6 +52,7 @@ jobs:
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 
@@ -87,7 +88,7 @@ jobs:
             prospectSaid: 'We are interested, but we need to understand the timing.'
           };
           const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 20000);
+          const timer = setTimeout(() => controller.abort(), 30000);
           try {
             const response = await fetch(endpoint, {
               method: 'POST',
@@ -100,7 +101,7 @@ jobs:
             const data = JSON.parse(text);
             if (!data.response || !data.question) throw new Error('AI endpoint returned no response/question');
             if (data.source === 'fallback' || data.source === 'offline') throw new Error(`Live AI provider was not used (source=${data.source})`);
-            console.log('CALLCONSOLE AI smoke test passed:', JSON.stringify({ source: data.source }));
+            console.log('CALLCONSOLE AI smoke test passed:', JSON.stringify({ source: data.source, model: data.model || null }));
           } finally {
             clearTimeout(timer);
           }
