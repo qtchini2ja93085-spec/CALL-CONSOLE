@@ -36,23 +36,91 @@ jobs:
           from pathlib import Path
           p = Path('www/index.html')
           s = p.read_text(encoding='utf-8')
+
+          # Keep the proven baseline Apply & Tailor workflow, but make the AERO
+          # controls real HTML so they cannot disappear because a dynamic anchor
+          # lookup fails inside the Android WebView.
+          marker = '<button class="btn btn-primary" id="apply-btn" onclick="applyAll()">✨ Apply & Tailor</button>'
+          aero = '''<div id="aero-script-modes" class="aero-script-modes-static" aria-label="Script Intelligence">
+            <div class="aero-title">SCRIPT INTELLIGENCE</div>
+            <div class="aero-sub">Choose how CALLCONSOLE tailors the script. Original/local is never overwritten.</div>
+            <div class="aero-btns">
+              <button type="button" data-mode="auto">⚡ AUTO / SMART</button>
+              <button type="button" data-mode="ai">🧠 AI TAILOR</button>
+              <button type="button" data-mode="local">📄 ORIGINAL / LOCAL</button>
+            </div>
+            <div id="aero-script-status">⚡ Auto mode ready.</div>
+            <div id="aero-ai-script">
+              <div class="aero-ai-label">🧠 AI TAILORED SCRIPT</div>
+              <div id="aero-ai-script-text" class="aero-ai-script-text"></div>
+              <div id="aero-ai-meta" class="aero-ai-meta"></div>
+              <div id="aero-ai-qs" class="aero-ai-q"></div>
+            </div>
+          </div>'''
+          if s.count('id="aero-script-modes"') != 0:
+              raise SystemExit('AERO controls already exist in baseline; refusing duplicate injection')
+          if marker not in s:
+              raise SystemExit('Expected Apply & Tailor button was not found')
+          s = s.replace(marker, marker + '\n' + aero, 1)
+
           old = 'function coachNextMove(){'
           if old not in s:
               raise SystemExit('Expected CALLCONSOLE coach function was not found')
           s = s.replace(old, 'function coachNextMoveLocal(){', 1)
-          marker = '<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
-          if marker not in s:
+
+          coach_marker = '<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
+          if coach_marker not in s:
               raise SystemExit('Expected CALLCONSOLE injection marker was not found')
-          inject = '''<script src="./ai-engine.js"></script>\n<script src="./script-modes.js"></script>\n<script>\nasync function coachNextMove(){\n    const input=document.getElementById("live-coach-input");\n    const text=input?input.value.trim():"";\n    if(!text){showStatus("⚡ Enter what the prospect said first.");return;}\n    const research=((document.getElementById("f-research")||{}).value||"");\n    const role=((document.getElementById("f-role")||{}).value||"the team").trim();\n    const company=((document.getElementById("f-company")||{}).value||"").trim();\n    const prospect=((document.getElementById("f-prospect")||{}).value||"").trim();\n    const product=((document.getElementById("f-product")||{}).value||"Jedox").trim();\n    const ctx={prospect,company,role,product,research,prospectSaid:text};\n    const result=await window.CALLCONSOLE_AI.nextMove({...ctx,localFallback:()=>window.CALLCONSOLE_AI.localNextMove(ctx)});\n    const rEl=document.getElementById("live-coach-response");if(rEl)rEl.textContent=result.response;\n    const qEl=document.getElementById("live-coach-question");if(qEl)qEl.textContent=result.question;\n    const resEl=document.getElementById("live-coach-result");if(resEl)resEl.classList.add("open");\n    showStatus(result.source!=="offline"?"🧠 AI coaching applied.":"⚡ Offline coaching applied.");\n}\n</script>\n\n'''
-          s=s.replace(marker,inject+marker,1)
-          p.write_text(s,encoding='utf-8')
+          inject = '''<script src="./ai-engine.js"></script>\n<script src="./script-modes.js"></script>\n<script>\nasync function coachNextMove(){\n    const input=document.getElementById("live-coach-input");\n    const text=input?input.value.trim():"";\n    if(!text){showStatus("⚡ Enter what the prospect said first.");return;}\n    const research=((document.getElementById("f-research")||{}).value||"");\n    const role=((document.getElementById("f-role")||{}).value||"the team").trim();\n    const company=((document.getElementById("f-company")||{}).value||"").trim();\n    const prospect=((document.getElementById("f-name")||{}).value||"").trim();\n    const product=((document.getElementById("f-product")||{}).value||"Jedox").trim();\n    const ctx={prospect,company,role,product,research,prospectSaid:text};\n    const result=await window.CALLCONSOLE_AI.nextMove({...ctx,localFallback:()=>window.CALLCONSOLE_AI.localNextMove(ctx)});\n    const rEl=document.getElementById("live-coach-response");if(rEl)rEl.textContent=result.response;\n    const qEl=document.getElementById("live-coach-question");if(qEl)qEl.textContent=result.question;\n    const resEl=document.getElementById("live-coach-result");if(resEl)resEl.classList.add("open");\n    showStatus(result.source!=="offline"?"🧠 AI coaching applied.":"⚡ Offline coaching applied.");\n}\n</script>\n\n'''
+          s=s.replace(coach_marker, inject + coach_marker, 1)
+          p.write_text(s, encoding='utf-8')
           PY
+
           node --check www/ai-engine.js
           node --check www/script-modes.js
           grep -q 'function coachNextMoveLocal' www/index.html
           grep -q 'function coachNextMove()' www/index.html
           grep -q 'CALLCONSOLE_AI.nextMove' www/index.html
           grep -q 'script-modes.js' www/index.html
+
+      - name: AERO UI structure and conflict checks
+        run: |
+          python3 - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re
+
+          html = Path('www/index.html').read_text(encoding='utf-8')
+
+          class Parser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.ids=[]
+                  self.modes=[]
+                  self.buttons=[]
+              def handle_starttag(self, tag, attrs):
+                  a=dict(attrs)
+                  if 'id' in a: self.ids.append(a['id'])
+                  if tag=='button':
+                      if 'data-mode' in a: self.modes.append(a['data-mode'])
+                      self.buttons.append((a.get('id'), a.get('type')))
+
+          p=Parser(); p.feed(html)
+          assert p.ids.count('aero-script-modes') == 1, 'AERO UI must exist exactly once'
+          assert set(['auto','ai','local']).issubset(set(p.modes)), f'Missing AERO modes: {p.modes}'
+          assert 'apply-btn' in p.ids, 'Apply & Tailor button missing'
+          assert 'f-name' in p.ids, 'Prospect name field missing'
+          assert 'f-role' in p.ids, 'Role field missing'
+          assert 'f-company' in p.ids, 'Company field missing'
+          assert 'f-research' in p.ids, 'Research field missing'
+          assert 'script-page' in p.ids, 'Script page missing'
+          assert 'live-coach-input' in p.ids, 'Live Coach input missing'
+          assert len(re.findall(r'function coachNextMove\s*\(\)', html)) == 1, 'Expected exactly one AI coach wrapper'
+          assert len(re.findall(r'function coachNextMoveLocal\s*\(\)', html)) == 1, 'Expected exactly one local coach function'
+          assert html.count('src="./script-modes.js"') == 1, 'script-modes.js must be loaded exactly once'
+          assert html.count('src="./ai-engine.js"') == 1, 'ai-engine.js must be loaded exactly once'
+          print('AERO UI structure/conflict checks: PASS')
+          PY
 
       - name: AERO local intelligence regression tests
         run: |
@@ -72,6 +140,22 @@ jobs:
           assert(ai.classify('Please call me back next week')==='timing','timing classification failed');
           assert(ai.classify('We have no budget this year')==='budget','budget classification failed');
           console.log('AERO local intelligence regression: PASS');
+          NODE
+
+      - name: AERO script-mode source checks
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const s=fs.readFileSync('www/script-modes.js','utf8');
+          const assert=(ok,msg)=>{if(!ok)throw new Error('AERO SCRIPT QA: '+msg);};
+          assert(s.includes("['f-name','f-prospect"),'prospect mapping must use f-name');
+          assert(s.includes("'#script-page'"),'local script must use the actual script page');
+          assert(s.includes("'#apply-btn'"),'dynamic fallback must recognize the actual Apply & Tailor button');
+          assert(s.includes("host.dataset.aeroBound==='1'"),'existing static UI must be safely bound once');
+          assert(s.includes("data-mode=\"auto\""),'AUTO mode missing');
+          assert(s.includes("data-mode=\"ai\""),'AI mode missing');
+          assert(s.includes("data-mode=\"local\""),'LOCAL mode missing');
+          console.log('AERO script-mode source checks: PASS');
           NODE
 
       - name: Set up Node.js
