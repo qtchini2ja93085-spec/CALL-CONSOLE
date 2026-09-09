@@ -35,7 +35,7 @@ jobs:
           marker='<button class="btn btn-primary" id="apply-btn" onclick="applyAll()">✨ Apply & Tailor</button>'
           aero='''<div id="aero-script-modes" class="aero-script-modes-static" aria-label="Script Intelligence">
             <div class="aero-title">SCRIPT INTELLIGENCE</div>
-            <div class="aero-sub">Choose how CALLCONSOLE tailors the script. Original/local is never overwritten.</div>
+            <div class="aero-sub">Choose how CALLCONSOLE tailors the script. Each option runs immediately. Original/local is never overwritten.</div>
             <div class="aero-btns">
               <button type="button" data-mode="auto">⚡ AUTO / SMART</button>
               <button type="button" data-mode="ai">🧠 AI TAILOR</button>
@@ -51,7 +51,7 @@ jobs:
           </div>'''
           if s.count('id="aero-script-modes"') != 0: raise SystemExit('AERO controls already exist in baseline; refusing duplicate injection')
           if marker not in s: raise SystemExit('Expected Apply & Tailor button was not found')
-          s=s.replace(marker,marker+'\n'+aero,1)
+          s=s.replace(marker,aero,1)
           old='function coachNextMove(){'
           if old not in s: raise SystemExit('Expected CALLCONSOLE coach function was not found')
           s=s.replace(old,'function coachNextMoveLocal(){',1)
@@ -102,7 +102,9 @@ jobs:
           p=Parser();p.feed(html)
           assert p.ids.count('aero-script-modes')==1
           assert set(['auto','ai','local']).issubset(set(p.modes))
-          for x in ['apply-btn','f-name','f-role','f-company','f-research','script-page','live-coach-input']:assert x in p.ids,x+' missing'
+          assert 'id="apply-btn"' not in html
+          assert 'Apply & Tailor' not in html
+          for x in ['f-name','f-role','f-company','f-research','script-page','live-coach-input']:assert x in p.ids,x+' missing'
           assert len(re.findall(r'function coachNextMove\s*\(\)',html))==1
           assert len(re.findall(r'function coachNextMoveLocal\s*\(\)',html))==1
           assert html.count('src="./script-modes.js"')==1
@@ -118,7 +120,7 @@ jobs:
       - name: AERO script-mode source checks
         run: |
           node - <<'NODE'
-          const fs=require('fs');const s=fs.readFileSync('www/script-modes.js','utf8');const assert=(ok,msg)=>{if(!ok)throw new Error('AERO SCRIPT QA: '+msg);};assert(s.includes("['f-name','f-prospect"),'prospect mapping must use f-name');assert(s.includes("'#script-page'"),'local script must use actual script page');assert(s.includes("'#apply-btn'"),'dynamic fallback must recognize Apply & Tailor');assert(s.includes("host.dataset.aeroBound==='1'"),'static UI binding guard missing');assert(s.includes("data-mode=\"auto\""),'AUTO mode missing');assert(s.includes("data-mode=\"ai\""),'AI mode missing');assert(s.includes("data-mode=\"local\""),'LOCAL mode missing');console.log('AERO script-mode source checks: PASS');
+          const fs=require('fs');const s=fs.readFileSync('www/script-modes.js','utf8');const assert=(ok,msg)=>{if(!ok)throw new Error('AERO SCRIPT QA: '+msg);};assert(s.includes("['f-name','f-prospect"),'prospect mapping must use f-name');assert(s.includes("'#script-page'"),'local script must use actual script page');assert(s.includes("'#apply-btn'"),'dynamic fallback must recognize legacy Apply & Tailor only if present');assert(s.includes("host.dataset.aeroBound==='1'"),'static UI binding guard missing');assert(s.includes("data-mode=\"auto\""),'AUTO mode missing');assert(s.includes("data-mode=\"ai\""),'AI mode missing');assert(s.includes("data-mode=\"local\""),'LOCAL mode missing');assert(s.includes('window.applyAll'),'mode buttons must execute script generation automatically');console.log('AERO script-mode source checks: PASS');
           NODE
       - name: Set up Node.js
         uses: actions/setup-node@v4
