@@ -26,12 +26,15 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "icon": [
+      "../resources/icons/icon-192.png",
+      "../resources/icons/icon-512.png"
+    ],
     "windows": {
       "nsis": {
         "installMode": "perUser",
         "displayLanguageSelector": false,
-        "startMenuFolder": "CALLCONSOLE",
-        "installerIcon": null
+        "startMenuFolder": "CALLCONSOLE"
       }
     }
   }
