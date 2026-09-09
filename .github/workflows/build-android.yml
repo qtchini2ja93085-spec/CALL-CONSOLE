@@ -54,6 +54,26 @@ jobs:
           grep -q 'CALLCONSOLE_AI.nextMove' www/index.html
           grep -q 'script-modes.js' www/index.html
 
+      - name: AERO local intelligence regression tests
+        run: |
+          node - <<'NODE'
+          const fs=require('fs'), vm=require('vm');
+          const source=fs.readFileSync('www/ai-engine.js','utf8');
+          const sandbox={window:{},console,setTimeout,clearTimeout};
+          vm.createContext(sandbox); vm.runInContext(source,sandbox);
+          const ai=sandbox.window.CALLCONSOLE_AI;
+          const assert=(ok,msg)=>{if(!ok)throw new Error('AERO QA: '+msg);};
+          assert(ai.systemsFrom('SAP S/4HANA with Power BI and Excel').includes('SAP S/4HANA'),'SAP S/4HANA detection failed');
+          assert(ai.systemsFrom('SAP S/4HANA with Power BI and Excel').includes('Power BI'),'Power BI detection failed');
+          assert(!ai.systemsFrom('The landscape is complex and it is improving').includes('SAP'),'false-positive SAP detection');
+          assert(ai.classify('We already use Anaplan today')==='existing_stack','existing-stack classification failed');
+          assert(!ai.signals('It is fine; nothing to change').stakeholder,'false-positive stakeholder signal');
+          assert(ai.signals('Our IT team owns the integration').stakeholder,'explicit IT stakeholder signal failed');
+          assert(ai.classify('Please call me back next week')==='timing','timing classification failed');
+          assert(ai.classify('We have no budget this year')==='budget','budget classification failed');
+          console.log('AERO local intelligence regression: PASS');
+          NODE
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -121,7 +141,9 @@ jobs:
           const data=JSON.parse(text);
           if(!data.script) throw new Error('AI tailoring returned no script');
           if(data.source==='fallback') throw new Error('Live AI tailoring provider was not used');
-          console.log('CALLCONSOLE AI script tailoring smoke test passed:',JSON.stringify({source:data.source,model:data.model||null,confidence:data.confidence||null}));
+          if(!Array.isArray(data.discoveryQuestions)||data.discoveryQuestions.length<3) throw new Error('AI tailoring returned fewer than 3 discovery questions');
+          if(!data.positioning) throw new Error('AI tailoring returned no positioning');
+          console.log('CALLCONSOLE AI script tailoring smoke test passed:',JSON.stringify({source:data.source,model:data.model||null,confidence:data.confidence||null,roleLens:data.roleLens||null}));
           NODE
 
       - name: Upload APK
