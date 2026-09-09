@@ -32,7 +32,7 @@
     ],
     "windows": {
       "nsis": {
-        "installMode": "perUser",
+        "installMode": "currentUser",
         "displayLanguageSelector": false,
         "startMenuFolder": "CALLCONSOLE"
       }
