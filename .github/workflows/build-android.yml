@@ -1,6 +1,5 @@
 name: Build CALLCONSOLE Android APK
 
-# Validate the bounded AERO AI v2 backend after Gemini tailoring timeout investigation.
 on:
   workflow_dispatch:
   push:
@@ -10,11 +9,9 @@ jobs:
   build-android:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Restore known-good CALLCONSOLE baseline
         run: |
           set -e
@@ -25,7 +22,6 @@ jobs:
           test -n "$SOURCE_DIR"
           cp -R "$SOURCE_DIR" www
           test -f www/index.html
-
       - name: Apply AI engine and CALLCONSOLE coach integration
         run: |
           set -e
@@ -35,10 +31,9 @@ jobs:
           cp build-assets/callconsole-script-modes.js www/script-modes.js
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('www/index.html')
-          s = p.read_text(encoding='utf-8')
-          marker = '<button class="btn btn-primary" id="apply-btn" onclick="applyAll()">✨ Apply & Tailor</button>'
-          aero = '''<div id="aero-script-modes" class="aero-script-modes-static" aria-label="Script Intelligence">
+          p=Path('www/index.html'); s=p.read_text(encoding='utf-8')
+          marker='<button class="btn btn-primary" id="apply-btn" onclick="applyAll()">✨ Apply & Tailor</button>'
+          aero='''<div id="aero-script-modes" class="aero-script-modes-static" aria-label="Script Intelligence">
             <div class="aero-title">SCRIPT INTELLIGENCE</div>
             <div class="aero-sub">Choose how CALLCONSOLE tailors the script. Original/local is never overwritten.</div>
             <div class="aero-btns">
@@ -56,15 +51,34 @@ jobs:
           </div>'''
           if s.count('id="aero-script-modes"') != 0: raise SystemExit('AERO controls already exist in baseline; refusing duplicate injection')
           if marker not in s: raise SystemExit('Expected Apply & Tailor button was not found')
-          s = s.replace(marker, marker + '\n' + aero, 1)
-          old = 'function coachNextMove(){'
+          s=s.replace(marker,marker+'\n'+aero,1)
+          old='function coachNextMove(){'
           if old not in s: raise SystemExit('Expected CALLCONSOLE coach function was not found')
-          s = s.replace(old, 'function coachNextMoveLocal(){', 1)
-          coach_marker = '<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
+          s=s.replace(old,'function coachNextMoveLocal(){',1)
+          coach_marker='<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
           if coach_marker not in s: raise SystemExit('Expected CALLCONSOLE injection marker was not found')
-          inject = '''<script src="./ai-engine.js"></script>\n<script src="./script-modes.js"></script>\n<script>\nasync function coachNextMove(){\n    const input=document.getElementById("live-coach-input");\n    const text=input?input.value.trim():"";\n    if(!text){showStatus("⚡ Enter what the prospect said first.");return;}\n    const research=((document.getElementById("f-research")||{}).value||"");\n    const role=((document.getElementById("f-role")||{}).value||"the team").trim();\n    const company=((document.getElementById("f-company")||{}).value||"").trim();\n    const prospect=((document.getElementById("f-name")||{}).value||"").trim();\n    const product=((document.getElementById("f-product")||{}).value||"Jedox").trim();\n    const ctx={prospect,company,role,product,research,prospectSaid:text};\n    const result=await window.CALLCONSOLE_AI.nextMove({...ctx,localFallback:()=>window.CALLCONSOLE_AI.localNextMove(ctx)});\n    const rEl=document.getElementById("live-coach-response");if(rEl)rEl.textContent=result.response;\n    const qEl=document.getElementById("live-coach-question");if(qEl)qEl.textContent=result.question;\n    const resEl=document.getElementById("live-coach-result");if(resEl)resEl.classList.add("open");\n    showStatus(result.source!=="offline"?"🧠 AI coaching applied.":"⚡ Offline coaching applied.");\n}\n</script>\n\n'''
-          s=s.replace(coach_marker, inject + coach_marker, 1)
-          p.write_text(s, encoding='utf-8')
+          inject='''<script src="./ai-engine.js"></script>
+          <script src="./script-modes.js"></script>
+          <script>
+          async function coachNextMove(){
+            const input=document.getElementById("live-coach-input"); const text=input?input.value.trim():"";
+            if(!text){showStatus("⚡ Enter what the prospect said first.");return;}
+            const research=((document.getElementById("f-research")||{}).value||"");
+            const role=((document.getElementById("f-role")||{}).value||"the team").trim();
+            const company=((document.getElementById("f-company")||{}).value||"").trim();
+            const prospect=((document.getElementById("f-name")||{}).value||"").trim();
+            const product=((document.getElementById("f-product")||{}).value||"Jedox").trim();
+            const ctx={prospect,company,role,product,research,prospectSaid:text};
+            const result=await window.CALLCONSOLE_AI.nextMove({...ctx,localFallback:()=>window.CALLCONSOLE_AI.localNextMove(ctx)});
+            const rEl=document.getElementById("live-coach-response"); if(rEl)rEl.textContent=result.response;
+            const qEl=document.getElementById("live-coach-question"); if(qEl)qEl.textContent=result.question;
+            const resEl=document.getElementById("live-coach-result"); if(resEl)resEl.classList.add("open");
+            showStatus(result.source!=="offline"?"🧠 AI coaching applied.":"⚡ Offline coaching applied.");
+          }
+          </script>
+          
+          '''
+          s=s.replace(coach_marker,inject+coach_marker,1); p.write_text(s,encoding='utf-8')
           PY
           node --check www/ai-engine.js
           node --check www/script-modes.js
@@ -72,71 +86,46 @@ jobs:
           grep -q 'function coachNextMove()' www/index.html
           grep -q 'CALLCONSOLE_AI.nextMove' www/index.html
           grep -q 'script-modes.js' www/index.html
-
       - name: AERO UI structure and conflict checks
         run: |
           python3 - <<'PY'
           from html.parser import HTMLParser
           from pathlib import Path
           import re
-          html = Path('www/index.html').read_text(encoding='utf-8')
+          html=Path('www/index.html').read_text(encoding='utf-8')
           class Parser(HTMLParser):
-              def __init__(self):
-                  super().__init__(); self.ids=[]; self.modes=[]
-              def handle_starttag(self, tag, attrs):
-                  a=dict(attrs)
-                  if 'id' in a: self.ids.append(a['id'])
-                  if tag=='button' and 'data-mode' in a: self.modes.append(a['data-mode'])
-          p=Parser(); p.feed(html)
-          assert p.ids.count('aero-script-modes') == 1
+            def __init__(self): super().__init__(); self.ids=[]; self.modes=[]
+            def handle_starttag(self,tag,attrs):
+              a=dict(attrs)
+              if 'id' in a:self.ids.append(a['id'])
+              if tag=='button' and 'data-mode' in a:self.modes.append(a['data-mode'])
+          p=Parser();p.feed(html)
+          assert p.ids.count('aero-script-modes')==1
           assert set(['auto','ai','local']).issubset(set(p.modes))
-          for x in ['apply-btn','f-name','f-role','f-company','f-research','script-page','live-coach-input']: assert x in p.ids, x+' missing'
-          assert len(re.findall(r'function coachNextMove\s*\(\)', html)) == 1
-          assert len(re.findall(r'function coachNextMoveLocal\s*\(\)', html)) == 1
-          assert html.count('src="./script-modes.js"') == 1
-          assert html.count('src="./ai-engine.js"') == 1
+          for x in ['apply-btn','f-name','f-role','f-company','f-research','script-page','live-coach-input']:assert x in p.ids,x+' missing'
+          assert len(re.findall(r'function coachNextMove\s*\(\)',html))==1
+          assert len(re.findall(r'function coachNextMoveLocal\s*\(\)',html))==1
+          assert html.count('src="./script-modes.js"')==1
+          assert html.count('src="./ai-engine.js"')==1
           print('AERO UI structure/conflict checks: PASS')
           PY
-
       - name: AERO local intelligence regression tests
         run: |
           node - <<'NODE'
-          const fs=require('fs'), vm=require('vm');
-          const source=fs.readFileSync('www/ai-engine.js','utf8');
-          const sandbox={window:{},console,setTimeout,clearTimeout}; vm.createContext(sandbox); vm.runInContext(source,sandbox);
-          const ai=sandbox.window.CALLCONSOLE_AI; const assert=(ok,msg)=>{if(!ok)throw new Error('AERO QA: '+msg);};
-          assert(ai.systemsFrom('SAP S/4HANA with Power BI and Excel').includes('SAP S/4HANA'),'SAP S/4HANA detection failed');
-          assert(ai.systemsFrom('SAP S/4HANA with Power BI and Excel').includes('Power BI'),'Power BI detection failed');
-          assert(!ai.systemsFrom('The landscape is complex and it is improving').includes('SAP'),'false-positive SAP detection');
-          assert(ai.classify('We already use Anaplan today')==='existing_stack','existing-stack classification failed');
-          assert(!ai.signals('It is fine; nothing to change').stakeholder,'false-positive stakeholder signal');
-          assert(ai.signals('Our IT team owns the integration').stakeholder,'explicit IT stakeholder signal failed');
-          assert(ai.classify('Please call me back next week')==='timing','timing classification failed');
-          assert(ai.classify('We have no budget this year')==='budget','budget classification failed');
-          console.log('AERO local intelligence regression: PASS');
+          const fs=require('fs'),vm=require('vm');const source=fs.readFileSync('www/ai-engine.js','utf8');const sandbox={window:{},console,setTimeout,clearTimeout};vm.createContext(sandbox);vm.runInContext(source,sandbox);const ai=sandbox.window.CALLCONSOLE_AI;const assert=(ok,msg)=>{if(!ok)throw new Error('AERO QA: '+msg);};
+          assert(ai.systemsFrom('SAP S/4HANA with Power BI and Excel').includes('SAP S/4HANA'),'SAP S/4HANA detection failed');assert(ai.systemsFrom('SAP S/4HANA with Power BI and Excel').includes('Power BI'),'Power BI detection failed');assert(!ai.systemsFrom('The landscape is complex and it is improving').includes('SAP'),'false-positive SAP detection');assert(ai.classify('We already use Anaplan today')==='existing_stack','existing-stack classification failed');assert(!ai.signals('It is fine; nothing to change').stakeholder,'false-positive stakeholder signal');assert(ai.signals('Our IT team owns the integration').stakeholder,'explicit IT stakeholder signal failed');assert(ai.classify('Please call me back next week')==='timing','timing classification failed');assert(ai.classify('We have no budget this year')==='budget','budget classification failed');console.log('AERO local intelligence regression: PASS');
           NODE
-
       - name: AERO script-mode source checks
         run: |
           node - <<'NODE'
-          const fs=require('fs'); const s=fs.readFileSync('www/script-modes.js','utf8'); const assert=(ok,msg)=>{if(!ok)throw new Error('AERO SCRIPT QA: '+msg);};
-          assert(s.includes("['f-name','f-prospect"),'prospect mapping must use f-name');
-          assert(s.includes("'#script-page'"),'local script must use the actual script page');
-          assert(s.includes("'#apply-btn'"),'dynamic fallback must recognize the actual Apply & Tailor button');
-          assert(s.includes("host.dataset.aeroBound==='1'"),'existing static UI must be safely bound once');
-          assert(s.includes("data-mode=\"auto\""),'AUTO mode missing'); assert(s.includes("data-mode=\"ai\""),'AI mode missing'); assert(s.includes("data-mode=\"local\""),'LOCAL mode missing');
-          console.log('AERO script-mode source checks: PASS');
+          const fs=require('fs');const s=fs.readFileSync('www/script-modes.js','utf8');const assert=(ok,msg)=>{if(!ok)throw new Error('AERO SCRIPT QA: '+msg);};assert(s.includes("['f-name','f-prospect"),'prospect mapping must use f-name');assert(s.includes("'#script-page'"),'local script must use actual script page');assert(s.includes("'#apply-btn'"),'dynamic fallback must recognize Apply & Tailor');assert(s.includes("host.dataset.aeroBound==='1'"),'static UI binding guard missing');assert(s.includes("data-mode=\"auto\""),'AUTO mode missing');assert(s.includes("data-mode=\"ai\""),'AI mode missing');assert(s.includes("data-mode=\"local\""),'LOCAL mode missing');console.log('AERO script-mode source checks: PASS');
           NODE
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        with: {node-version: 22}
       - name: Set up Java
         uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "21"
+        with: {distribution: temurin, java-version: "21"}
       - name: Install dependencies
         run: npm install
       - name: Generate Android project
@@ -151,16 +140,14 @@ jobs:
           node - <<'NODE'
           const endpoint='https://intelligent-outreach-builder.vercel.app/api/callconsole-ai';
           const payload={prospect:'Smoke Test Prospect',company:'Smoke Test Co',role:'CFO',product:'Jedox',research:'Test-only validation request. Do not invent facts.',prospectSaid:'We are interested, but we need to understand the timing.'};
-          const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),30000);
-          try{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});const text=await response.text();if(!response.ok)throw new Error(`HTTP ${response.status}: ${text}`);const data=JSON.parse(text);if(!data.response||!data.question)throw new Error('AI endpoint returned no response/question');if(data.source==='fallback'||data.source==='offline')throw new Error(`Live AI provider was not used (source=${data.source})`);console.log('CALLCONSOLE AI smoke test passed:',JSON.stringify({source:data.source,model:data.model||null}));}finally{clearTimeout(timer)}
+          const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
+          try{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});const text=await response.text();if(!response.ok)throw new Error(`HTTP ${response.status}: ${text}`);const data=JSON.parse(text);if(!data.response||!data.question)throw new Error('AI endpoint returned no response/question');if(data.source==='offline')throw new Error('AI endpoint returned offline response');console.log('CALLCONSOLE AI smoke test passed:',JSON.stringify({source:data.source,model:data.model||null}));}finally{clearTimeout(timer)}
           NODE
       - name: Smoke test AI script tailoring
         run: |
           node - <<'NODE'
-          const endpoint='https://intelligent-outreach-builder.vercel.app/api/callconsole-ai';
-          const payload={task:'script_tailoring',prospect:'Smoke Test Prospect',company:'Smoke Test Co',role:'Business Transformation Director',department:'Transformation',product:'Jedox',research:'Test-only research. Role is not a standard finance title; keep claims cautious.',localScript:'Hi, may I take 30 seconds to understand how your team currently handles planning and reporting?'};
-          const controller=new AbortController(); const timer=setTimeout(()=>controller.abort(),30000);
-          try{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});const text=await response.text();if(!response.ok)throw new Error(`HTTP ${response.status}: ${text}`);const data=JSON.parse(text);if(!data.script)throw new Error('AI tailoring returned no script');if(data.source==='fallback')throw new Error('Live AI tailoring provider was not used');if(!Array.isArray(data.discoveryQuestions)||data.discoveryQuestions.length<3)throw new Error('AI tailoring returned fewer than 3 discovery questions');if(!data.positioning)throw new Error('AI tailoring returned no positioning');console.log('CALLCONSOLE AI script tailoring smoke test passed:',JSON.stringify({source:data.source,model:data.model||null,confidence:data.confidence||null,roleLens:data.roleLens||null}));}finally{clearTimeout(timer)}
+          const endpoint='https://intelligent-outreach-builder.vercel.app/api/callconsole-ai';const payload={task:'script_tailoring',prospect:'Smoke Test Prospect',company:'Smoke Test Co',role:'Business Transformation Director',department:'Transformation',product:'Jedox',research:'Test-only research. Role is not a standard finance title; keep claims cautious.',localScript:'Hi, may I take 30 seconds to understand how your team currently handles planning and reporting?'};const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
+          try{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});const text=await response.text();if(!response.ok)throw new Error(`HTTP ${response.status}: ${text}`);const data=JSON.parse(text);if(!data.script)throw new Error('AI tailoring returned no script');if(data.source==='fallback'||data.source==='offline')throw new Error('AI tailoring returned invalid fallback source');if(!Array.isArray(data.discoveryQuestions)||data.discoveryQuestions.length<3)throw new Error('AI tailoring returned fewer than 3 discovery questions');if(!data.positioning)throw new Error('AI tailoring returned no positioning');console.log('CALLCONSOLE AI script tailoring smoke test passed:',JSON.stringify({source:data.source,model:data.model||null,confidence:data.confidence||null,roleLens:data.roleLens||null}));}finally{clearTimeout(timer)}
           NODE
       - name: Upload APK
         uses: actions/upload-artifact@v4
