@@ -49,14 +49,14 @@ jobs:
               <div id="aero-ai-qs" class="aero-ai-q"></div>
             </div>
           </div>'''
-          # Remove stale copies and legacy Apply & Tailor controls from the baseline.
+          # Normalize the baseline: remove stale AERO, remove any non-primary legacy
+          # Apply & Tailor buttons, then replace the real apply-btn exactly once.
           s=re.sub(r'<div\b[^>]*\bid=["\']aero-script-modes["\'][^>]*>.*?</div>\s*(?=<|$)', '', s, count=1, flags=re.S|re.I)
-          s=re.sub(r'<button\b[^>]*(?:\bid=["\']apply-btn["\']|>)[^>]*>\s*[^<]*Apply\s*(?:&|and)\s*Tailor\s*</button>', '', s, flags=re.S|re.I)
+          s=re.sub(r'<button\b(?![^>]*\bid=["\']apply-btn["\'])[^>]*>\s*[^<]*Apply\s*(?:&|and)\s*Tailor\s*</button>', '', s, flags=re.S|re.I)
           pattern=r'<button\b[^>]*\bid=["\']apply-btn["\'][^>]*>.*?</button>'
           s2,n=re.subn(pattern,aero,s,count=1,flags=re.S|re.I)
           if n != 1: raise SystemExit('Expected Apply & Tailor button with id=apply-btn was not found')
           s=s2
-          # Remove any residual legacy label from the HTML baseline.
           s=re.sub(r'Apply\s*(?:&|and)\s*Tailor','',s,flags=re.I)
           old='function coachNextMove(){'
           if old not in s: raise SystemExit('Expected CALLCONSOLE coach function was not found')
