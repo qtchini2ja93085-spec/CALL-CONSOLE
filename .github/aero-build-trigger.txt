@@ -1,0 +1,1 @@
+Force Android build to package the latest AERO script behavior.
