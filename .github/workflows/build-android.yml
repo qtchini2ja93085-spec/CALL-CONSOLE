@@ -31,8 +31,8 @@ jobs:
           cp build-assets/callconsole-script-modes.js www/script-modes.js
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p=Path('www/index.html'); s=p.read_text(encoding='utf-8')
-          marker='<button class="btn btn-primary" id="apply-btn" onclick="applyAll()">✨ Apply & Tailor</button>'
           aero='''<div id="aero-script-modes" class="aero-script-modes-static" aria-label="Script Intelligence">
             <div class="aero-title">SCRIPT INTELLIGENCE</div>
             <div class="aero-sub">Choose how CALLCONSOLE tailors the script. Each option runs immediately. Original/local is never overwritten.</div>
@@ -50,8 +50,10 @@ jobs:
             </div>
           </div>'''
           if s.count('id="aero-script-modes"') != 0: raise SystemExit('AERO controls already exist in baseline; refusing duplicate injection')
-          if marker not in s: raise SystemExit('Expected Apply & Tailor button was not found')
-          s=s.replace(marker,aero,1)
+          pattern=r'<button\b[^>]*\bid=["\']apply-btn["\'][^>]*>.*?</button>'
+          s2,n=re.subn(pattern,aero,s,count=1,flags=re.S|re.I)
+          if n != 1: raise SystemExit('Expected Apply & Tailor button with id=apply-btn was not found')
+          s=s2
           old='function coachNextMove(){'
           if old not in s: raise SystemExit('Expected CALLCONSOLE coach function was not found')
           s=s.replace(old,'function coachNextMoveLocal(){',1)
