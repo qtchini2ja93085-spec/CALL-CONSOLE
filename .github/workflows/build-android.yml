@@ -49,7 +49,8 @@ jobs:
               <div id="aero-ai-qs" class="aero-ai-q"></div>
             </div>
           </div>'''
-          if s.count('id="aero-script-modes"') != 0: raise SystemExit('AERO controls already exist in baseline; refusing duplicate injection')
+          # Remove any stale copy so the build always has exactly one authoritative AERO block.
+          s=re.sub(r'<div\b[^>]*\bid=["\']aero-script-modes["\'][^>]*>.*?</div>\s*(?=<|$)', '', s, count=1, flags=re.S|re.I)
           pattern=r'<button\b[^>]*\bid=["\']apply-btn["\'][^>]*>.*?</button>'
           s2,n=re.subn(pattern,aero,s,count=1,flags=re.S|re.I)
           if n != 1: raise SystemExit('Expected Apply & Tailor button with id=apply-btn was not found')
@@ -59,6 +60,10 @@ jobs:
           s=s.replace(old,'function coachNextMoveLocal(){',1)
           coach_marker='<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
           if coach_marker not in s: raise SystemExit('Expected CALLCONSOLE injection marker was not found')
+          # The baseline ZIP may already contain old copies. Remove every script tag that
+          # references either integration asset, independent of attribute order or ./ prefix.
+          s=re.sub(r'<script\b[^>]*ai-engine\.js[^>]*>.*?</script\s*>','',s,flags=re.S|re.I)
+          s=re.sub(r'<script\b[^>]*script-modes\.js[^>]*>.*?</script\s*>','',s,flags=re.S|re.I)
           inject='''<script src="./ai-engine.js"></script>
           <script src="./script-modes.js"></script>
           <script>
@@ -80,11 +85,8 @@ jobs:
           </script>
           
           '''
-          # The baseline ZIP can already contain references to these integration assets.
-          # Normalize them first, then inject exactly one authoritative copy.
-          s=re.sub(r'<script\b[^>]*\bsrc=["\'](?:\./)?ai-engine\.js["\'][^>]*>\s*</script\s*>','',s,flags=re.I)
-          s=re.sub(r'<script\b[^>]*\bsrc=["\'](?:\./)?script-modes\.js["\'][^>]*>\s*</script\s*>','',s,flags=re.I)
-          s=s.replace(coach_marker,inject+coach_marker,1); p.write_text(s,encoding='utf-8')
+          s=s.replace(coach_marker,inject+coach_marker,1)
+          p.write_text(s,encoding='utf-8')
           PY
           node --check www/ai-engine.js
           node --check www/script-modes.js
@@ -100,11 +102,12 @@ jobs:
           import re
           html=Path('www/index.html').read_text(encoding='utf-8')
           class Parser(HTMLParser):
-            def __init__(self): super().__init__(); self.ids=[]; self.modes=[]
+            def __init__(self): super().__init__(); self.ids=[]; self.modes=[]; self.scripts=[]
             def handle_starttag(self,tag,attrs):
               a=dict(attrs)
               if 'id' in a:self.ids.append(a['id'])
               if tag=='button' and 'data-mode' in a:self.modes.append(a['data-mode'])
+              if tag=='script' and a.get('src'):self.scripts.append(a['src'])
           p=Parser();p.feed(html)
           assert p.ids.count('aero-script-modes')==1
           assert set(['auto','ai','local']).issubset(set(p.modes))
@@ -113,8 +116,10 @@ jobs:
           for x in ['f-name','f-role','f-company','f-research','script-page','live-coach-input']:assert x in p.ids,x+' missing'
           assert len(re.findall(r'function coachNextMove\s*\(\)',html))==1
           assert len(re.findall(r'function coachNextMoveLocal\s*\(\)',html))==1
-          assert html.count('src="./script-modes.js"')==1
-          assert html.count('src="./ai-engine.js"')==1
+          aero_scripts=[x for x in p.scripts if re.search(r'(^|/)script-modes\.js(?:[?#]|$)',x,re.I)]
+          ai_scripts=[x for x in p.scripts if re.search(r'(^|/)ai-engine\.js(?:[?#]|$)',x,re.I)]
+          assert len(aero_scripts)==1,('script-modes script tags: '+str(aero_scripts))
+          assert len(ai_scripts)==1,('ai-engine script tags: '+str(ai_scripts))
           print('AERO UI structure/conflict checks: PASS')
           PY
       - name: AERO local intelligence regression tests
