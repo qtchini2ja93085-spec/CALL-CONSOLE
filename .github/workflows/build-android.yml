@@ -49,19 +49,20 @@ jobs:
               <div id="aero-ai-qs" class="aero-ai-q"></div>
             </div>
           </div>'''
-          # Remove any stale copy so the build always has exactly one authoritative AERO block.
+          # Remove stale copies and legacy Apply & Tailor controls from the baseline.
           s=re.sub(r'<div\b[^>]*\bid=["\']aero-script-modes["\'][^>]*>.*?</div>\s*(?=<|$)', '', s, count=1, flags=re.S|re.I)
+          s=re.sub(r'<button\b[^>]*(?:\bid=["\']apply-btn["\']|>)[^>]*>\s*[^<]*Apply\s*(?:&|and)\s*Tailor\s*</button>', '', s, flags=re.S|re.I)
           pattern=r'<button\b[^>]*\bid=["\']apply-btn["\'][^>]*>.*?</button>'
           s2,n=re.subn(pattern,aero,s,count=1,flags=re.S|re.I)
           if n != 1: raise SystemExit('Expected Apply & Tailor button with id=apply-btn was not found')
           s=s2
+          # Remove any residual legacy label from the HTML baseline.
+          s=re.sub(r'Apply\s*(?:&|and)\s*Tailor','',s,flags=re.I)
           old='function coachNextMove(){'
           if old not in s: raise SystemExit('Expected CALLCONSOLE coach function was not found')
           s=s.replace(old,'function coachNextMoveLocal(){',1)
           coach_marker='<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
           if coach_marker not in s: raise SystemExit('Expected CALLCONSOLE injection marker was not found')
-          # The baseline ZIP may already contain old copies. Remove every script tag that
-          # references either integration asset, independent of attribute order or ./ prefix.
           s=re.sub(r'<script\b[^>]*ai-engine\.js[^>]*>.*?</script\s*>','',s,flags=re.S|re.I)
           s=re.sub(r'<script\b[^>]*script-modes\.js[^>]*>.*?</script\s*>','',s,flags=re.S|re.I)
           inject='''<script src="./ai-engine.js"></script>
