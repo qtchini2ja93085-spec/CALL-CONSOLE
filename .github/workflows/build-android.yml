@@ -34,23 +34,15 @@ jobs:
           import re
           p=Path('www/index.html'); s=p.read_text(encoding='utf-8')
           aero='''<div id="aero-script-modes" class="aero-script-modes-static" aria-label="Script Intelligence">
-            <div class="aero-title">SCRIPT INTELLIGENCE</div>
-            <div class="aero-sub">Choose how CALLCONSOLE tailors the script. Each option runs immediately. Original/local is never overwritten.</div>
+            <div class="aero-title">SCRIPT INTELLIGENCE <span id="aero-ai-indicator" class="aero-indicator local">● LOCAL READY</span></div>
+            <div class="aero-sub">Choose how CALLCONSOLE tailors the live script. Each option runs immediately.</div>
             <div class="aero-btns">
               <button type="button" data-mode="auto">⚡ AUTO / SMART</button>
               <button type="button" data-mode="ai">🧠 AI TAILOR</button>
               <button type="button" data-mode="local">📄 ORIGINAL / LOCAL</button>
             </div>
             <div id="aero-script-status">⚡ Auto mode ready.</div>
-            <div id="aero-ai-script">
-              <div class="aero-ai-label">🧠 AI TAILORED SCRIPT</div>
-              <div id="aero-ai-script-text" class="aero-ai-script-text"></div>
-              <div id="aero-ai-meta" class="aero-ai-meta"></div>
-              <div id="aero-ai-qs" class="aero-ai-q"></div>
-            </div>
           </div>'''
-          # Normalize the baseline: remove stale AERO, remove any non-primary legacy
-          # Apply & Tailor buttons, then replace the real apply-btn exactly once.
           s=re.sub(r'<div\b[^>]*\bid=["\']aero-script-modes["\'][^>]*>.*?</div>\s*(?=<|$)', '', s, count=1, flags=re.S|re.I)
           s=re.sub(r'<button\b(?![^>]*\bid=["\']apply-btn["\'])[^>]*>\s*[^<]*Apply\s*(?:&|and)\s*Tailor\s*</button>', '', s, flags=re.S|re.I)
           pattern=r'<button\b[^>]*\bid=["\']apply-btn["\'][^>]*>.*?</button>'
@@ -111,7 +103,9 @@ jobs:
               if tag=='script' and a.get('src'):self.scripts.append(a['src'])
           p=Parser();p.feed(html)
           assert p.ids.count('aero-script-modes')==1
+          assert p.ids.count('aero-ai-indicator')==1
           assert set(['auto','ai','local']).issubset(set(p.modes))
+          assert 'aero-ai-script' not in html
           assert 'id="apply-btn"' not in html
           assert 'Apply & Tailor' not in html
           for x in ['f-name','f-role','f-company','f-research','script-page','live-coach-input']:assert x in p.ids,x+' missing'
