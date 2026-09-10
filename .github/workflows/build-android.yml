@@ -80,6 +80,10 @@ jobs:
           </script>
           
           '''
+          # The baseline ZIP can already contain references to these integration assets.
+          # Normalize them first, then inject exactly one authoritative copy.
+          s=re.sub(r'<script\b[^>]*\bsrc=["\'](?:\./)?ai-engine\.js["\'][^>]*>\s*</script\s*>','',s,flags=re.I)
+          s=re.sub(r'<script\b[^>]*\bsrc=["\'](?:\./)?script-modes\.js["\'][^>]*>\s*</script\s*>','',s,flags=re.I)
           s=s.replace(coach_marker,inject+coach_marker,1); p.write_text(s,encoding='utf-8')
           PY
           node --check www/ai-engine.js
