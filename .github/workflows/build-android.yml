@@ -126,7 +126,8 @@ jobs:
       - name: AERO script-mode source checks
         run: |
           node - <<'NODE'
-          const fs=require('fs');const s=fs.readFileSync('www/script-modes.js','utf8');const assert=(ok,msg)=>{if(!ok)throw new Error('AERO SCRIPT QA: '+msg);};assert(s.includes("['f-name','f-prospect"),'prospect mapping must use f-name');assert(s.includes("'#script-page'"),'local script must use actual script page');assert(s.includes("'#apply-btn'"),'dynamic fallback must recognize legacy Apply & Tailor only if present');assert(s.includes("host.dataset.aeroBound==='1'"),'static UI binding guard missing');assert(s.includes("data-mode=\"auto\""),'AUTO mode missing');assert(s.includes("data-mode=\"ai\""),'AI mode missing');assert(s.includes("data-mode=\"local\""),'LOCAL mode missing');assert(s.includes('window.applyAll'),'mode buttons must execute script generation automatically');console.log('AERO script-mode source checks: PASS');
+          const fs=require('fs');const s=fs.readFileSync('www/script-modes.js','utf8');const assert=(ok,msg)=>{if(!ok)throw new Error('AERO SCRIPT QA: '+msg);};assert(s.includes("['f-name','f-prospect"),'prospect mapping must use f-name');assert(s.includes("'#script-page'"),'local script must use actual script page');assert(s.includes("'#apply-btn'"),'dynamic fallback must recognize legacy Apply & Tailor only if present');assert(s.includes("host.dataset.aeroBound==='1'"),'static UI binding guard missing');assert(s.includes("data-mode=\"auto\""),'AUTO mode missing');assert(s.includes("data-mode=\"ai\""),'AI mode missing');assert(s.includes("data-mode=\"local\""),'LOCAL mode missing');assert(s.includes('window.applyAll'),'mode buttons must execute script generation automatically');
+          assert(s.includes('localBaselineHTML'),'styled HTML baseline must be cached');assert(s.includes('restoreBaseline()'),'exact styled baseline restore must exist');assert(s.includes('applyReplacementsToStyledBaseline'),'AI must apply replacements to styled DOM');assert(s.includes('e.innerHTML=localBaselineHTML'),'restore must restore original HTML');assert(!s.includes('setScriptText(d.script)'),'AI must never replace the styled script with plain AI text');assert(s.includes('Array.isArray(d.replacements)'),'AI response must use surgical replacements');console.log('AERO style-preservation/conflict source checks: PASS');
           NODE
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -156,8 +157,20 @@ jobs:
         continue-on-error: true
         run: |
           node - <<'NODE'
-          const endpoint='https://intelligent-outreach-builder.vercel.app/api/callconsole-ai';const payload={task:'script_tailoring',prospect:'Smoke Test Prospect',company:'Smoke Test Co',role:'Business Transformation Director',department:'Transformation',product:'Jedox',research:'Test-only research. Role is not a standard finance title; keep claims cautious.',localScript:'Hi, may I take 30 seconds to understand how your team currently handles planning and reporting?'};const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
-          try{const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});const text=await response.text();if(!response.ok)throw new Error(`HTTP ${response.status}: ${text}`);const data=JSON.parse(text);if(!data.script)throw new Error('AI tailoring returned no script');if(!Array.isArray(data.discoveryQuestions)||data.discoveryQuestions.length<3)throw new Error('AI tailoring returned fewer than 3 discovery questions');if(!data.positioning)throw new Error('AI tailoring returned no positioning');console.log('CALLCONSOLE AI tailoring smoke:',JSON.stringify({source:data.source||null,model:data.model||null,confidence:data.confidence||null}));}finally{clearTimeout(timer)}
+          const endpoint='https://intelligent-outreach-builder.vercel.app/api/callconsole-ai';
+          const original='Hi, may I take 30 seconds to understand how your team currently handles planning and reporting?';
+          const payload={task:'script_tailoring',prospect:'Smoke Test Prospect',company:'Smoke Test Co',role:'Business Transformation Director',department:'Transformation',product:'Jedox',research:'Test-only research. Role is not a standard finance title; keep claims cautious.',localScript:original};
+          const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),15000);
+          try{
+            const response=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});
+            const text=await response.text();if(!response.ok)throw new Error(`HTTP ${response.status}: ${text}`);
+            const data=JSON.parse(text);if(!data.script)throw new Error('AI tailoring returned no script');
+            if(!Array.isArray(data.replacements))throw new Error('AI tailoring returned no replacements array');
+            if(!data.positioning)throw new Error('AI tailoring returned no positioning');
+            if(data.source!=='local'&&data.replacements.length>0){let out=original;for(const x of data.replacements){if(!x.find||typeof x.replace!=='string'||out.indexOf(x.find)<0)throw new Error('Invalid surgical replacement returned');out=out.replace(x.find,x.replace);}if(out!==data.script)throw new Error('Returned script does not equal surgical replacements applied to original');}
+            if(data.source==='local'&&data.script!==original)throw new Error('Local fallback changed the immutable original script');
+            console.log('CALLCONSOLE AI tailoring smoke:',JSON.stringify({source:data.source||null,model:data.model||null,replacements:data.replacements.length,confidence:data.confidence||null}));
+          }finally{clearTimeout(timer)}
           NODE
       - name: Upload APK
         uses: actions/upload-artifact@v4
