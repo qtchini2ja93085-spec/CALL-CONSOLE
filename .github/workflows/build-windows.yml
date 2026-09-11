@@ -22,6 +22,51 @@ jobs:
         with:
           node-version: 22
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Repair Tauri Windows icon
+        shell: pwsh
+        run: |
+          python -m pip install --disable-pip-version-check --quiet pillow
+          @'
+          from PIL import Image, ImageDraw, ImageFont
+          from pathlib import Path
+
+          out = Path("src-tauri/icons/icon.ico")
+          out.parent.mkdir(parents=True, exist_ok=True)
+
+          sizes = [16, 24, 32, 48, 64, 128, 256]
+          images = []
+          for size in sizes:
+              img = Image.new("RGBA", (size, size), (14, 23, 42, 255))
+              draw = ImageDraw.Draw(img)
+              margin = max(1, size // 12)
+              draw.rounded_rectangle(
+                  (margin, margin, size - margin - 1, size - margin - 1),
+                  radius=max(2, size // 6),
+                  fill=(30, 64, 175, 255),
+                  outline=(147, 197, 253, 255),
+                  width=max(1, size // 32),
+              )
+              try:
+                  font = ImageFont.truetype("arialbd.ttf", max(8, int(size * 0.42)))
+              except OSError:
+                  font = ImageFont.load_default()
+              text = "CC"
+              box = draw.textbbox((0, 0), text, font=font)
+              tw, th = box[2] - box[0], box[3] - box[1]
+              draw.text(((size - tw) / 2, (size - th) / 2 - box[1]), text, fill=(255, 255, 255, 255), font=font)
+              images.append(img)
+
+          images[-1].save(out, format="ICO", sizes=[(s, s) for s in sizes])
+          if out.stat().st_size < 1024:
+              raise SystemExit("Generated icon.ico is unexpectedly small")
+          print(f"Generated {out} ({out.stat().st_size} bytes)")
+          '@ | python -
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
