@@ -1,0 +1,1 @@
+Fix role-aware AERO baseline synchronization and portal Quick Objection modal above backdrop.
