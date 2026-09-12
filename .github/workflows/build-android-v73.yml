@@ -1,0 +1,169 @@
+name: Build CALLCONSOLE Android APK v73
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  build-android-v73:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore CALLCONSOLE baseline
+        run: |
+          set -e
+          rm -rf /tmp/callconsole www
+          mkdir -p /tmp/callconsole
+          unzip -q CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip -d /tmp/callconsole
+          SOURCE_DIR="$(find /tmp/callconsole -type f -path '*/www/index.html' -print -quit | xargs dirname)"
+          test -n "$SOURCE_DIR"
+          cp -R "$SOURCE_DIR" www
+          test -f www/index.html
+
+      - name: Apply AERO build integration and second-pass fixes
+        run: |
+          set -e
+          cp build-assets/callconsole-ai-engine.js www/ai-engine.js
+          cp build-assets/callconsole-script-modes.js www/script-modes.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('www/index.html')
+          s=p.read_text(encoding='utf-8')
+          aero='''<div id="aero-script-modes" class="aero-script-modes-static" aria-label="Script Intelligence">
+            <div class="aero-title">SCRIPT INTELLIGENCE <span id="aero-ai-indicator" class="aero-indicator local">● LOCAL READY</span></div>
+            <div class="aero-sub">Choose how CALLCONSOLE tailors the live script. Each option runs immediately.</div>
+            <div class="aero-btns">
+              <button type="button" data-mode="auto">⚡ AUTO / SMART</button>
+              <button type="button" data-mode="ai">🧠 AI TAILOR</button>
+              <button type="button" data-mode="local">📄 ORIGINAL / LOCAL</button>
+            </div>
+            <div id="aero-script-status">⚡ Auto mode ready.</div>
+          </div>'''
+          s=re.sub(r'<div\\b[^>]*\\bid=["\']aero-script-modes["\'][^>]*>.*?</div>\\s*(?=<|$)','',s,count=1,flags=re.S|re.I)
+          s=re.sub(r'<button\\b(?![^>]*\\bid=["\']apply-btn["\'])[^>]*>\\s*[^<]*Apply\\s*(?:&|and)\\s*Tailor\\s*</button>','',s,flags=re.S|re.I)
+          s,n=re.subn(r'<button\\b[^>]*\\bid=["\']apply-btn["\'][^>]*>.*?</button>',aero,s,count=1,flags=re.S|re.I)
+          if n!=1: raise SystemExit('apply button anchor missing')
+          s=re.sub(r'Apply\\s*(?:&|and)\\s*Tailor','',s,flags=re.I)
+          if 'function coachNextMove(){' not in s: raise SystemExit('coach function missing')
+          s=s.replace('function coachNextMove(){','function coachNextMoveLocal(){',1)
+          marker='<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
+          if marker not in s: raise SystemExit('coach marker missing')
+          s=re.sub(r'<script\\b[^>]*ai-engine\\.js[^>]*>.*?</script\\s*>','',s,flags=re.S|re.I)
+          s=re.sub(r'<script\\b[^>]*script-modes\\.js[^>]*>.*?</script\\s*>','',s,flags=re.S|re.I)
+          inject='''<script src="./ai-engine.js"></script>
+          <script src="./script-modes.js"></script>
+          <script>
+          (function(){
+            function installRoleSuggestions(){
+              var role=document.getElementById('f-role'); if(!role)return;
+              var grid=document.getElementById('aero-role-presets'); if(grid)grid.remove();
+              var dl=document.getElementById('aero-role-suggestions');
+              if(!dl){dl=document.createElement('datalist');dl.id='aero-role-suggestions';role.setAttribute('list',dl.id);role.parentNode.appendChild(dl);}
+              if(dl.childElementCount)return;
+              ['CFO','FVP Finance','SVP Finance','EVP Finance','VP Finance','AVP Finance','General Manager Finance and Administration','General Manager Operations','General Manager Commercial','General Manager Strategy','Head of FP&A','Head of Finance','Finance Director','Financial Controller','Head of Strategy','Strategy Director','Business Transformation Director','Head of Transformation','Head of Shared Services','COO / Operations','Chief Strategy Officer','Chief Transformation Officer','Chief Digital Officer','Chief Commercial Officer','Chief Revenue Officer','Head of Supply Chain','Chief Procurement Officer','Head of Treasury','Head of Performance Management','Workforce Planning Lead','Sales Operations Director','Revenue Operations Director','Head of Corporate Planning','Enterprise Performance / EPM Lead'].forEach(function(v){var o=document.createElement('option');o.value=v;dl.appendChild(o);});
+            role.setAttribute('autocomplete','off');
+          }
+          function cleanRoleGrid(){var g=document.getElementById('aero-role-presets');if(g)g.remove();}
+          installRoleSuggestions();
+          new MutationObserver(function(){cleanRoleGrid();installRoleSuggestions();}).observe(document.body,{childList:true,subtree:true});
+          })();
+          </script>
+          '''
+          s=s.replace(marker,inject+marker,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('www/script-modes.js')
+          s=p.read_text(encoding='utf-8')
+          s=s.replace("https://intelligent-outreach-builder.vercel.app/api/callconsole-ai","https://intelligent-outreach-builder.vercel.app/api/callconsole-ai-fast")
+          s=re.sub(r'const rolePresets=\[.*?\];\\nfunction addRolePresets\(\)\{.*?\}\\nfunction setBusy', 'function setBusy', s, count=1, flags=re.S)
+          s=s.replace('portalQuickObjectionCard();syncRolePresentation();addRolePresets();','portalQuickObjectionCard();syncRolePresentation();')
+          p.write_text(s,encoding='utf-8')
+          PY
+          node --check www/script-modes.js
+          node --check www/ai-engine.js
+
+      - name: Second-pass UI and mode QA
+        run: |
+          set -e
+          ! grep -q 'aero-role-presets' www/script-modes.js
+          ! grep -q 'addRolePresets' www/script-modes.js
+          grep -q 'callconsole-ai-fast' www/script-modes.js
+          grep -q 'aero-role-suggestions' www/index.html
+          grep -q 'data-mode="auto"' www/index.html
+          grep -q 'data-mode="ai"' www/index.html
+          grep -q 'data-mode="local"' www/index.html
+          grep -q 'quick-obj-card' www/script-modes.js
+          echo 'Second-pass UI QA: PASS'
+
+      - name: Script preservation regression QA
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const s=fs.readFileSync('www/script-modes.js','utf8');
+          const a=(ok,m)=>{if(!ok)throw new Error(m)};
+          a(s.includes('localBaselineHTML'),'HTML baseline missing');
+          a(s.includes('restoreBaseline()'),'restore baseline missing');
+          a(s.includes('applyReplacementsToStyledBaseline'),'styled surgical replacement missing');
+          a(!s.includes('setScriptText(d.script)'),'plain AI script replacement detected');
+          a(s.includes('Array.isArray(d.replacements)'),'replacement validation missing');
+          a(s.includes("host.dataset.aeroBound==='1'"),'binding guard missing');
+          console.log('Script preservation QA: PASS');
+          NODE
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Sync web app
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+
+      - name: Fast AI tailoring smoke test
+        continue-on-error: true
+        run: |
+          node - <<'NODE'
+          const endpoint='https://intelligent-outreach-builder.vercel.app/api/callconsole-ai-fast';
+          const original='Hi, may I take 30 seconds to understand how your team currently handles planning and reporting?';
+          const payload={task:'script_tailoring',prospect:'Smoke Test Prospect',company:'Smoke Test Co',role:'Business Transformation Director',department:'Transformation',product:'Jedox',research:'Test-only research. Keep claims cautious.',localScript:original};
+          const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),10000);
+          try{
+            const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:ctl.signal});
+            const d=JSON.parse(await r.text());
+            if(!r.ok||!d.script||!Array.isArray(d.replacements))throw new Error('fast endpoint contract failed');
+            let out=original; for(const x of d.replacements){if(!x.find||out.indexOf(x.find)<0)throw new Error('invalid replacement');out=out.replace(x.find,String(x.replace??''));}
+            if(out!==d.script)throw new Error('surgical output mismatch');
+            console.log('Fast AI smoke:',JSON.stringify({source:d.source,model:d.model,replacements:d.replacements.length}));
+          } finally {clearTimeout(t)}
+          NODE
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CALLCONSOLE-Android-Debug-APK-v73
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
