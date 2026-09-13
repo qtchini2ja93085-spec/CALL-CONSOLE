@@ -39,7 +39,10 @@ jobs:
           end=s.find('function setBusy', start if start >= 0 else 0)
           if start >= 0 and end >= 0:
               s=s[:start]+s[end:]
+          # Remove the legacy preset initialization and its MutationObserver branch
+          # without leaving an orphaned if-statement behind.
           s=s.replace('portalQuickObjectionCard();syncRolePresentation();addRolePresets();','portalQuickObjectionCard();syncRolePresentation();')
+          s=re.sub(r"if\(!document\.getElementById\(['\"]aero-role-presets['\"]\)\)\s*addRolePresets\s*\(\s*\)\s*;",'',s)
           s=re.sub(r'addRolePresets\s*\(\s*\)\s*;','',s)
           # Remove any remaining legacy role-preset identifiers from the generated JS.
           # The actual role suggestions live in the native datalist injected into index.html.
