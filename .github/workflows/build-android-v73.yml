@@ -40,8 +40,12 @@ jobs:
           if start >= 0 and end >= 0:
               s=s[:start]+s[end:]
           s=s.replace('portalQuickObjectionCard();syncRolePresentation();addRolePresets();','portalQuickObjectionCard();syncRolePresentation();')
-          s=re.sub(r'if\(!document\.getElementById\(\'aero-role-presets\'\)\)addRolePresets\(\);','',s)
-          s=re.sub(r'#aero-role-presets\{.*?\.aero-role-preset:hover\{.*?\}','',s,count=1,flags=re.S)
+          s=re.sub(r'addRolePresets\s*\(\s*\)\s*;','',s)
+          # Remove any remaining legacy role-preset identifiers from the generated JS.
+          # The actual role suggestions live in the native datalist injected into index.html.
+          s=s.replace('aero-role-presets','role-presets-disabled')
+          s=s.replace('addRolePresets','addRolePresetsDisabled')
+          s=re.sub(r'addRolePresetsDisabled\s*\(\s*\)\s*;','',s)
           s=s.replace('https://intelligent-outreach-builder.vercel.app/api/callconsole-ai','https://intelligent-outreach-builder.vercel.app/api/callconsole-ai-fast')
           p.write_text(s,encoding='utf-8')
 
