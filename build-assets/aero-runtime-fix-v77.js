@@ -1,21 +1,15 @@
-/* CALLCONSOLE AERO v77 runtime: mode buttons are always switchable. */
+/* CALLCONSOLE AERO v77.1 runtime hardening: race/cancellation guard + mode-button unlock */
 (function(){
 'use strict';
-function unlock(host){
-  if(!host)return;
-  host.classList.add('aero-runtime-ready');
-  host.querySelectorAll('button[data-mode]').forEach(function(b){
-    b.disabled=false;
-    b.removeAttribute('disabled');
-    b.removeAttribute('aria-disabled');
-  });
-}
-function boot(){
-  var host=document.getElementById('aero-script-modes');
-  if(!host){setTimeout(boot,150);return;}
-  unlock(host);
-  var observer=new MutationObserver(function(){unlock(host);});
-  observer.observe(host,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled','aria-disabled']});
-}
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot);else boot();
+var AI_ENDPOINT='https://intelligent-outreach-builder.vercel.app/api/callconsole-ai-fast';
+var activeAI=null;
+function unlock(){var box=document.getElementById('aero-script-modes');if(!box)return;box.classList.add('aero-runtime-ready');box.querySelectorAll('button[data-mode]').forEach(function(b){b.disabled=false;b.removeAttribute('disabled');b.removeAttribute('aria-disabled');});}
+function abortActiveAI(){if(activeAI){try{activeAI.abort();}catch(_){ }activeAI=null;}}
+var originalFetch=window.fetch.bind(window);
+window.fetch=function(input,init){var url=typeof input==='string'?input:(input&&input.url)||'';var method=((init&&init.method)||(input&&input.method)||'GET').toUpperCase();if(method==='POST'&&url===AI_ENDPOINT){abortActiveAI();var controller=new AbortController();activeAI=controller;var callerSignal=(init&&init.signal)||(input&&input.signal);var onAbort=function(){try{controller.abort();}catch(_){ }};if(callerSignal){if(callerSignal.aborted)onAbort();else callerSignal.addEventListener('abort',onAbort,{once:true});}var next=Object.assign({},init||{},{signal:controller.signal});return originalFetch(input,next).finally(function(){if(activeAI===controller)activeAI=null;});}return originalFetch(input,init);};
+function bindModeClicks(){var box=document.getElementById('aero-script-modes');if(!box||box.dataset.aeroHardeningBound==='1')return;box.dataset.aeroHardeningBound='1';box.addEventListener('click',function(ev){var b=ev.target&&ev.target.closest?ev.target.closest('button[data-mode]'):null;if(b&&b.dataset.mode!=='ai')abortActiveAI();},true);}
+function tick(){unlock();bindModeClicks();}
+tick();
+new MutationObserver(tick).observe(document.documentElement,{childList:true,subtree:true});
+setInterval(tick,750);
 })();
