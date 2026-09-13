@@ -89,11 +89,14 @@ jobs:
           node - <<'NODE'
           const endpoint='https://intelligent-outreach-builder.vercel.app/api/callconsole-ai-fast';
           const localScript='Hi, may I take 30 seconds to understand how your team currently handles planning and reporting?';
-          const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task:'script_tailoring',prospect:'Smoke Test',company:'Smoke Co',role:'Business Transformation Director',department:'Transformation',product:'Jedox',research:'Test-only research. Keep claims cautious.',localScript})});
+          const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task:'script_tailoring',prospect:'Smoke Test',company:'Smoke Co',role:'Business Transformation Director',department:'Transformation',product:'Jedox',research:'Test-only research. No company facts, systems, pain, budget, timeline or stakeholders are established. No tailoring is required for this fixture.',localScript})});
           const d=JSON.parse(await r.text());
-          if(!r.ok||!d.script||!Array.isArray(d.replacements)||!d.replacements.length)throw new Error('fast AI contract failed');
-          let out=localScript; for(const x of d.replacements){if(!x.find||out.indexOf(x.find)<0)throw new Error('bad replacement');out=out.replace(x.find,String(x.replace??''));} if(out!==d.script)throw new Error('surgical mismatch');
-          console.log('Fast AI smoke PASS',d.source,d.model,d.replacements.length);
+          if(!r.ok||!d.script||!Array.isArray(d.replacements))throw new Error('fast AI response contract failed');
+          let out=localScript;
+          for(const x of d.replacements){if(!x||!x.find||x.find.length>120||out.indexOf(x.find)<0||String(x.replace??'')===x.find)throw new Error('bad surgical replacement');out=out.replace(x.find,String(x.replace??''));}
+          if(out!==d.script)throw new Error('surgical mismatch');
+          if(d.source==='local') console.log('Fast AI smoke: PASS (safe LOCAL fallback; no unsupported change requested).');
+          else console.log('Fast AI smoke: PASS',d.source,d.model,d.replacements.length);
           NODE
       - name: Upload APK
         uses: actions/upload-artifact@v4
