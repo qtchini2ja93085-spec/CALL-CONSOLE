@@ -1,0 +1,111 @@
+name: Build CALLCONSOLE Android APK v76
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-android-v76:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Restore baseline
+        run: |
+          set -e
+          rm -rf /tmp/callconsole www
+          mkdir -p /tmp/callconsole
+          unzip -q CALLCONSOLE-ANDROID-CAPACITOR-PROJECT.zip -d /tmp/callconsole
+          SOURCE_DIR="$(find /tmp/callconsole -type f -path '*/www/index.html' -print -quit | xargs dirname)"
+          test -n "$SOURCE_DIR"
+          cp -R "$SOURCE_DIR" www
+          test -f www/index.html
+      - name: Apply AERO integration and runtime fix
+        run: |
+          set -e
+          cp build-assets/callconsole-ai-engine.js www/ai-engine.js
+          cp build-assets/callconsole-script-modes.js www/script-modes.js
+          cp build-assets/aero-runtime-fix.js www/aero-runtime-fix.js
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('www/script-modes.js')
+          s=p.read_text(encoding='utf-8')
+          start=s.find('const rolePresets=')
+          end=s.find('function setBusy',start if start>=0 else 0)
+          if start>=0 and end>=0:s=s[:start]+s[end:]
+          s=re.sub(r"if\(!document\.getElementById\(['\"]aero-role-presets['\"]\)\)\s*addRolePresets\s*\(\s*\)\s*;",'',s)
+          s=s.replace('portalQuickObjectionCard();syncRolePresentation();addRolePresets();','portalQuickObjectionCard();syncRolePresentation();')
+          s=re.sub(r'addRolePresets\s*\(\s*\)\s*;','',s)
+          s=s.replace('aero-role-presets','role-presets-disabled')
+          s=s.replace('https://intelligent-outreach-builder.vercel.app/api/callconsole-ai','https://intelligent-outreach-builder.vercel.app/api/callconsole-ai-fast')
+          p.write_text(s,encoding='utf-8')
+          p=Path('www/index.html')
+          s=p.read_text(encoding='utf-8')
+          s=re.sub(r'<div\b[^>]*\bid=["\']aero-role-presets["\'][^>]*>.*?</div>\s*','',s,count=1,flags=re.S|re.I)
+          marker='<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
+          if marker not in s:raise SystemExit('coach marker missing')
+          s=re.sub(r'<script\b[^>]*src=["\'][^"\']*ai-engine\.js[^"\']*["\'][^>]*>\s*</script\s*>','',s,flags=re.S|re.I)
+          s=re.sub(r'<script\b[^>]*src=["\'][^"\']*script-modes\.js[^"\']*["\'][^>]*>\s*</script\s*>','',s,flags=re.S|re.I)
+          inject='''<script src="./ai-engine.js"></script><script src="./script-modes.js"></script><script src="./aero-runtime-fix.js"></script><style id="aero-role-suggest-style">.aero-role-suggest-wrap{position:relative;width:100%;z-index:99990}.aero-role-suggest{position:absolute;left:0;right:0;top:calc(100% + 6px);display:none;max-height:280px;overflow-y:auto;background:#111821;border:1px solid rgba(91,111,145,.75);border-radius:14px;box-shadow:0 18px 42px rgba(0,0,0,.55);z-index:99999;padding:6px}.aero-role-suggest.open{display:block}.aero-role-option{display:block;width:100%;box-sizing:border-box;border:0;border-bottom:1px solid rgba(255,255,255,.10);background:transparent;color:#e9edf5;text-align:left;padding:12px 14px;font:inherit;font-size:16px;line-height:1.25;cursor:pointer;border-radius:9px}.aero-role-option.selected,.aero-role-option:active{background:rgba(35,190,200,.16);color:#7de8ed}#aero-script-modes.aero-runtime-ready .aero-btns button[data-mode]{opacity:1!important;filter:none!important;pointer-events:auto!important;color:#e9edf5!important}#aero-script-modes.aero-runtime-ready .aero-btns button[data-mode].active{color:#ffffff!important;box-shadow:0 0 0 1px rgba(60,190,220,.65),0 0 22px rgba(60,190,220,.22)}#aero-script-modes.aero-runtime-ready .aero-btns button[data-mode]:not(.active){border-color:rgba(91,111,145,.7)!important}</style><script>(function(){var roles=['CFO','FVP Finance','SVP Finance','EVP Finance','VP Finance','AVP Finance','General Manager Finance and Administration','General Manager Operations','General Manager Commercial','General Manager Strategy','Head of FP&A','Head of Finance','Finance Director','Financial Controller','Head of Strategy','Strategy Director','Business Transformation Director','Head of Transformation','Head of Shared Services','COO / Operations','Chief Strategy Officer','Chief Transformation Officer','Chief Digital Officer','Chief Commercial Officer','Chief Revenue Officer','Head of Supply Chain','Chief Procurement Officer','Head of Treasury','Head of Performance Management','Workforce Planning Lead','Sales Operations Director','Revenue Operations Director','Head of Corporate Planning','Enterprise Performance / EPM Lead'];function install(){var r=document.getElementById('f-role');if(!r||r.dataset.aeroSuggest)return;r.dataset.aeroSuggest='1';var w=r.parentNode;if(!w)return;w.classList.add('aero-role-suggest-wrap');var m=document.createElement('div');m.id='aero-role-suggestions';m.className='aero-role-suggest';m.setAttribute('role','listbox');w.appendChild(m);function close(){m.classList.remove('open')}function render(){var q=(r.value||'').trim().toLowerCase();if(!q){close();return}var a=roles.filter(function(x){return x.toLowerCase().indexOf(q)>=0}).slice(0,10);m.innerHTML='';a.forEach(function(x){var b=document.createElement('button');b.type='button';b.className='aero-role-option';b.textContent=x;b.onclick=function(){r.value=x;r.dispatchEvent(new Event('input',{bubbles:true}));r.dispatchEvent(new Event('change',{bubbles:true}));close();r.focus()};m.appendChild(b)});m.classList.toggle('open',a.length>0)}r.addEventListener('input',render);r.addEventListener('focus',render);r.addEventListener('blur',function(){setTimeout(close,180)})}install();new MutationObserver(install).observe(document.body,{childList:true,subtree:true})})();</script>'''
+          s=s.replace(marker,inject+marker,1)
+          p.write_text(s,encoding='utf-8')
+          PY
+          node --check www/script-modes.js
+          node --check www/ai-engine.js
+          node --check www/aero-runtime-fix.js
+      - name: QA generated web app
+        run: |
+          set -e
+          ! grep -q 'aero-role-presets' www/script-modes.js
+          ! grep -q 'addRolePresets' www/script-modes.js
+          ! grep -q '<datalist' www/index.html
+          grep -q 'aero-role-suggestions' www/index.html
+          grep -q 'aero-runtime-fix.js' www/index.html
+          grep -q 'callconsole-ai-fast' www/script-modes.js
+          grep -q 'data-mode="auto"' www/script-modes.js
+          grep -q 'data-mode="ai"' www/script-modes.js
+          grep -q 'data-mode="local"' www/script-modes.js
+          grep -q 'localBaselineHTML' www/script-modes.js
+          grep -q 'applyReplacementsToStyledBaseline' www/script-modes.js
+          ! grep -q 'setScriptText(d.script)' www/script-modes.js
+          echo 'v76 QA: PASS'
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install dependencies
+        run: npm install
+      - name: Generate Android project
+        run: npx cap add android
+      - name: Sync web app
+        run: npx cap sync android
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: Fast AI tailoring smoke test
+        continue-on-error: true
+        run: |
+          node - <<'NODE'
+          const endpoint='https://intelligent-outreach-builder.vercel.app/api/callconsole-ai-fast';
+          const localScript='Hi, may I take 30 seconds to understand how your team currently handles planning and reporting?';
+          const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task:'script_tailoring',prospect:'Smoke Test',company:'Smoke Co',role:'Business Transformation Director',department:'Transformation',product:'Jedox',research:'Test-only research. Keep claims cautious.',localScript})});
+          const d=JSON.parse(await r.text());
+          if(!r.ok||!d.script||!Array.isArray(d.replacements))throw new Error('fast AI contract failed');
+          let out=localScript; for(const x of d.replacements){if(!x.find||out.indexOf(x.find)<0)throw new Error('bad replacement');out=out.replace(x.find,String(x.replace??''));} if(out!==d.script)throw new Error('surgical mismatch');
+          console.log('Fast AI smoke PASS',d.source,d.model,d.replacements.length);
+          NODE
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CALLCONSOLE-Android-Debug-APK-v76
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
