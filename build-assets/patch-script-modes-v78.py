@@ -4,17 +4,12 @@ import re
 p = Path('www/script-modes.js')
 s = p.read_text(encoding='utf-8')
 
-old = r"const complexRoles=/\\b\\(transformation\\|operations\\|strategy\\|enablement\\|excellence\\|business partner\\|program\\|portfolio\\|digital\\|change\\|shared services\\|innovation\\|growth\\|planning lead\\|performance management\\|finance and administration\\|administration\\|enterprise performance\\|corporate planning\\|business planning\\|workforce planning\\|revenue operations\\|sales operations\\|commercial planning\\|integrated business planning\\)\\b/i;"
-new = r"const complexRoles=/\\b(transformation|operations|strategy|enablement|excellence|business partner|program|portfolio|digital|change|shared services|innovation|growth|planning lead|performance management|finance and administration|administration|enterprise performance|corporate planning|business planning|workforce planning|revenue operations|sales operations|commercial planning|integrated business planning|enterprise applications?|application portfolio|business systems?|systems? manager|systems? owner|sap|erp|process owner|application owner|applications? manager|applications? director|technology architecture|solution architecture|enterprise architecture|integration architecture|data architecture|master data|data governance|business intelligence|bi manager|analytics manager|data & analytics|reporting & analytics|information systems)\\b/i;"
-if old not in s:
-    # The asset is minified; use a structural replacement independent of exact escaping.
-    pat = r"const complexRoles=/\\b\\([^;]+?\\)\\b/i;"
-    m = re.search(pat, s)
-    if not m:
-        raise SystemExit('complexRoles declaration not found')
-    s = s[:m.start()] + new + s[m.end():]
-else:
-    s = s.replace(old, new, 1)
+new = r"const complexRoles=/\b(transformation|operations|strategy|enablement|excellence|business partner|program|portfolio|digital|change|shared services|innovation|growth|planning lead|performance management|finance and administration|administration|enterprise performance|corporate planning|business planning|workforce planning|revenue operations|sales operations|commercial planning|integrated business planning|enterprise applications?|application portfolio|business systems?|systems? manager|systems? owner|sap|erp|process owner|application owner|applications? manager|applications? director|technology architecture|solution architecture|enterprise architecture|integration architecture|data architecture|master data|data governance|business intelligence|bi manager|analytics manager|data & analytics|reporting & analytics|information systems)\b/i;"
+pat = r"const complexRoles=/\b\([^;]+?\)\b/i;"
+m = re.search(pat, s)
+if not m:
+    raise SystemExit('complexRoles declaration not found')
+s = s[:m.start()] + new + s[m.end():]
 
 old_dec = "if(complexRoles.test(all))return{ai:true,reason:'Role/function is cross-functional or complex; AI can better align the message to the evidence.'};"
 new_dec = "if(complexRoles.test(role))return{ai:true,reason:'Specialist responsibility role detected; AI should align to the exact ownership and process lens.'};if(complexRoles.test(all))return{ai:true,reason:'Role/function is cross-functional or complex; AI can better align the message to the evidence.'};"
