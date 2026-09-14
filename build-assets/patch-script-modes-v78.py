@@ -5,7 +5,7 @@ p = Path('www/script-modes.js')
 s = p.read_text(encoding='utf-8')
 
 new = r"const complexRoles=/\b(transformation|operations|strategy|enablement|excellence|business partner|program|portfolio|digital|change|shared services|innovation|growth|planning lead|performance management|finance and administration|administration|enterprise performance|corporate planning|business planning|workforce planning|revenue operations|sales operations|commercial planning|integrated business planning|enterprise applications?|application portfolio|business systems?|systems? manager|systems? owner|sap|erp|process owner|application owner|applications? manager|applications? director|technology architecture|solution architecture|enterprise architecture|integration architecture|data architecture|master data|data governance|business intelligence|bi manager|analytics manager|data & analytics|reporting & analytics|information systems)\b/i;"
-pat = r"const complexRoles=/\b\([^;]+?\)\b/i;"
+pat = r"const complexRoles=/[^;]+/i;"
 m = re.search(pat, s)
 if not m:
     raise SystemExit('complexRoles declaration not found')
