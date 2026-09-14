@@ -13,7 +13,7 @@ new = r"const complexRoles=/\b(transformation|operations|strategy|enablement|exc
 s = s[:start] + new + s[end + 1:]
 
 old_dec = "if(complexRoles.test(all))return{ai:true,reason:'Role/function is cross-functional or complex; AI can better align the message to the evidence.'};"
-new_dec = "if(complexRoles.test(role))return{ai:true,reason:'Specialist responsibility role detected; AI should align to the exact ownership and process lens.'};if(complexRoles.test(all))return{ai:true,reason:'Role/function is cross-functional or complex; AI can better align the message to the evidence.'};"
+new_dec = "if(complexRoles.test(role))return{ai:true,reason:'specialist responsibility role detected; AI should align to the exact ownership and process lens.'};if(complexRoles.test(all))return{ai:true,reason:'Role/function is cross-functional or complex; AI can better align the message to the evidence.'};"
 if old_dec not in s:
     raise SystemExit('decision anchor not found')
 s = s.replace(old_dec, new_dec, 1)
