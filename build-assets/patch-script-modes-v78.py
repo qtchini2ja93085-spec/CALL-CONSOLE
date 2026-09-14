@@ -20,3 +20,4 @@ s = s.replace(old_dec, new_dec, 1)
 
 p.write_text(s, encoding='utf-8')
 print('v78 local intelligence patch applied')
+# v78 rebuild trigger: rerun generated-web QA after deterministic role-signal patch.
