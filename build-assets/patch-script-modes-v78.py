@@ -18,6 +18,11 @@ if old_dec not in s:
     raise SystemExit('decision anchor not found')
 s = s.replace(old_dec, new_dec, 1)
 
+# Keep the proven original role-search UI as the only visible suggestion dropdown.
+# V78's integration layer may inject a newer dark #aero-role-suggestions element;
+# remove it immediately so it can never stack over the original gold-highlighted UI.
+s += "\n(function(){function removeInjectedRoleDropdown(){var m=document.getElementById('aero-role-suggestions');if(m&&m.parentNode)m.parentNode.removeChild(m);var r=document.getElementById('f-role');if(r&&r.parentNode)r.parentNode.classList.remove('aero-role-suggest-wrap')}if(typeof document!=='undefined'){removeInjectedRoleDropdown();new MutationObserver(removeInjectedRoleDropdown).observe(document.documentElement||document.body,{childList:true,subtree:true})}})();\n"
+
 p.write_text(s, encoding='utf-8')
 print('v78 local intelligence patch applied')
 # v78 rebuild trigger: rerun generated-web QA after deterministic role-signal patch.
