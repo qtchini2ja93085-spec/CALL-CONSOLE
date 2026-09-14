@@ -33,16 +33,19 @@ jobs:
           import re
           p=Path('www/index.html')
           s=p.read_text(encoding='utf-8')
-          # Remove the legacy standalone Apply & Tailor action. Script Intelligence is the only control surface.
           s=re.sub(r'<button\b[^>]*\bid=["\']apply-btn["\'][^>]*>.*?</button>\s*','',s,count=1,flags=re.S|re.I)
-          # Remove legacy injected role-preset block if present.
           s=re.sub(r'<div\b[^>]*\bid=["\']aero-role-presets["\'][^>]*>.*?</div>\s*','',s,count=1,flags=re.S|re.I)
           marker='<!-- V22 End-to-End QA: context-aware Coach, workflow duration, CRM sync, quick-outcome state fixes -->'
           if marker not in s: raise SystemExit('coach marker missing')
           s=re.sub(r'<script\b[^>]*src=["\'][^"\']*ai-engine\.js[^"\']*["\'][^>]*>\s*</script\s*>','',s,flags=re.S|re.I)
           s=re.sub(r'<script\b[^>]*src=["\'][^"\']*script-modes\.js[^"\']*["\'][^>]*>\s*</script\s*>','',s,flags=re.S|re.I)
           s=re.sub(r'<script\b[^>]*src=["\'][^"\']*aero-runtime-fix\.js[^"\']*["\'][^>]*>\s*</script\s*>','',s,flags=re.S|re.I)
-          inject='''<script src="./ai-engine.js"></script><script src="./script-modes.js"></script><script src="./aero-runtime-fix.js"></script><style id="aero-role-suggest-style">.aero-role-suggest-wrap{position:relative;width:100%;z-index:99990}.aero-role-suggest{position:absolute;left:0;right:0;top:calc(100% + 6px);display:none;max-height:280px;overflow-y:auto;background:#111821;border:1px solid rgba(91,111,145,.75);border-radius:14px;box-shadow:0 18px 42px rgba(0,0,0,.55);z-index:99999;padding:6px}.aero-role-suggest.open{display:block}.aero-role-option{display:block;width:100%;box-sizing:border-box;border:0;border-bottom:1px solid rgba(255,255,255,.10);background:transparent;color:#e9edf5;text-align:left;padding:12px 14px;font:inherit;font-size:16px;line-height:1.25;cursor:pointer;border-radius:9px}.aero-role-option.selected,.aero-role-option:active{background:rgba(35,190,200,.16);color:#7de8ed}#aero-script-modes.aero-runtime-ready .aero-btns button[data-mode]{opacity:1!important;filter:none!important;pointer-events:auto!important;color:#e9edf5!important}#aero-script-modes.aero-runtime-ready .aero-btns button[data-mode].active{color:#ffffff!important;box-shadow:0 0 0 1px rgba(60,190,220,.65),0 0 22px rgba(60,190,220,.22)}#aero-script-modes.aero-runtime-ready .aero-btns button[data-mode]:not(.active){border-color:rgba(91,111,145,.7)!important}</style><script>(function(){var roles=['CFO','FVP Finance','SVP Finance','EVP Finance','VP Finance','AVP Finance','General Manager Finance and Administration','General Manager Operations','General Manager Commercial','General Manager Strategy','Head of FP&A','Head of Finance','Finance Director','Financial Controller','Head of Strategy','Strategy Director','Business Transformation Director','Head of Transformation','Head of Shared Services','COO / Operations','Chief Strategy Officer','Chief Transformation Officer','Chief Digital Officer','Chief Commercial Officer','Chief Revenue Officer','Head of Supply Chain','Chief Procurement Officer','Head of Treasury','Head of Performance Management','Workforce Planning Lead','Sales Operations Director','Revenue Operations Director','Head of Corporate Planning','Enterprise Performance / EPM Lead'];function install(){var r=document.getElementById('f-role');if(!r||r.dataset.aeroSuggest)return;r.dataset.aeroSuggest='1';var w=r.parentNode;if(!w)return;w.classList.add('aero-role-suggest-wrap');var m=document.createElement('div');m.id='aero-role-suggestions';m.className='aero-role-suggest';m.setAttribute('role','listbox');w.appendChild(m);function close(){m.classList.remove('open')}function render(){var q=(r.value||'').trim().toLowerCase();if(!q){close();return}var a=roles.filter(function(x){return x.toLowerCase().indexOf(q)>=0}).slice(0,10);m.innerHTML='';a.forEach(function(x){var b=document.createElement('button');b.type='button';b.className='aero-role-option';b.textContent=x;b.onclick=function(){r.value=x;r.dispatchEvent(new Event('input',{bubbles:true}));r.dispatchEvent(new Event('change',{bubbles:true}));close();r.focus()};m.appendChild(b)});m.classList.toggle('open',a.length>0)}r.addEventListener('input',render);r.addEventListener('focus',render);r.addEventListener('blur',function(){setTimeout(close,180)})}install();new MutationObserver(install).observe(document.body,{childList:true,subtree:true})})();</script>'''
+          s=re.sub(r'<div\b[^>]*\bid=["\']aero-script-modes["\'][^>]*>.*?</div>\s*','',s,count=1,flags=re.S|re.I)
+          static_host='''<div id="aero-script-modes" aria-label="Script Intelligence"><div class="aero-title">SCRIPT INTELLIGENCE <span id="aero-ai-indicator" class="aero-indicator local">● LOCAL READY</span></div><div class="aero-sub">Choose how CALLCONSOLE tailors the live script. Each option runs immediately.</div><div class="aero-btns"><button type="button" data-mode="auto" aria-pressed="true">⚡ AUTO / SMART</button><button type="button" data-mode="ai" aria-pressed="false">🧠 AI TAILOR</button><button type="button" data-mode="local" aria-pressed="false">📄 ORIGINAL / LOCAL</button></div><div id="aero-script-status">⚡ Auto mode ready.</div></div>'''
+          pat=r'(<div\b[^>]*\bid=["\']ctrl-hint-box["\'][^>]*>.*?</div>)'
+          s,n=re.subn(pat,r'\1\n\n'+static_host,s,count=1,flags=re.S|re.I)
+          if n!=1: raise SystemExit('ctrl-hint-box insertion anchor missing')
+          inject='''<script src="./ai-engine.js"></script><script src="./script-modes.js"></script><script src="./aero-runtime-fix.js"></script><style id="aero-role-suggest-style">.aero-role-suggest-wrap{position:relative;width:100%;z-index:99990}.aero-role-suggest{position:absolute;left:0;right:0;top:calc(100% + 6px);display:none;max-height:280px;overflow-y:auto;background:#111821;border:1px solid rgba(91,111,145,.75);border-radius:14px;box-shadow:0 18px 42px rgba(0,0,0,.55);z-index:99999;padding:6px}.aero-role-suggest.open{display:block}.aero-role-option{display:block;width:100%;box-sizing:border-box;border:0;border-bottom:1px solid rgba(255,255,255,.10);background:transparent;color:#e9edf5;text-align:left;padding:12px 14px;font:inherit;font-size:16px;line-height:1.25;cursor:pointer;border-radius:9px}.aero-role-option.selected,.aero-role-option:active{background:rgba(35,190,200,.16);color:#7de8ed}#aero-script-modes{display:block!important;visibility:visible!important;opacity:1!important;width:100%;box-sizing:border-box;position:relative;z-index:50;clear:both;margin:12px 0;padding:12px;border:1px solid rgba(91,111,145,.7);border-radius:14px;background:rgba(17,24,33,.96)}#aero-script-modes .aero-btns{display:flex;gap:9px;flex-wrap:wrap}#aero-script-modes button[data-mode]{display:inline-block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;min-height:44px;border:2px solid rgba(91,111,145,.7);border-radius:12px;padding:10px 13px;background:transparent;color:#e9edf5;font-weight:800;cursor:pointer}#aero-script-modes.aero-runtime-ready .aero-btns button[data-mode].active{color:#ffffff!important;box-shadow:0 0 0 1px rgba(60,190,220,.65),0 0 22px rgba(60,190,220,.22)}#aero-script-modes.aero-runtime-ready .aero-btns button[data-mode]:not(.active){border-color:rgba(91,111,145,.7)!important}</style><script>(function(){var roles=['CFO','FVP Finance','SVP Finance','EVP Finance','VP Finance','AVP Finance','General Manager Finance and Administration','General Manager Operations','General Manager Commercial','General Manager Strategy','Head of FP&A','Head of Finance','Finance Director','Financial Controller','Head of Strategy','Strategy Director','Business Transformation Director','Head of Transformation','Head of Shared Services','COO / Operations','Chief Strategy Officer','Chief Transformation Officer','Chief Digital Officer','Chief Commercial Officer','Chief Revenue Officer','Head of Supply Chain','Chief Procurement Officer','Head of Treasury','Head of Performance Management','Workforce Planning Lead','Sales Operations Director','Revenue Operations Director','Head of Corporate Planning','Enterprise Performance / EPM Lead'];function install(){var r=document.getElementById('f-role');if(!r||r.dataset.aeroSuggest)return;r.dataset.aeroSuggest='1';var w=r.parentNode;if(!w)return;w.classList.add('aero-role-suggest-wrap');var m=document.createElement('div');m.id='aero-role-suggestions';m.className='aero-role-suggest';m.setAttribute('role','listbox');w.appendChild(m);function close(){m.classList.remove('open')}function render(){var q=(r.value||'').trim().toLowerCase();if(!q){close();return}var a=roles.filter(function(x){return x.toLowerCase().indexOf(q)>=0}).slice(0,10);m.innerHTML='';a.forEach(function(x){var b=document.createElement('button');b.type='button';b.className='aero-role-option';b.textContent=x;b.onclick=function(){r.value=x;r.dispatchEvent(new Event('input',{bubbles:true}));r.dispatchEvent(new Event('change',{bubbles:true}));close();r.focus()};m.appendChild(b)});m.classList.toggle('open',a.length>0)}r.addEventListener('input',render);r.addEventListener('focus',render);r.addEventListener('blur',function(){setTimeout(close,180)})}install();new MutationObserver(install).observe(document.body,{childList:true,subtree:true})})();</script>'''
           s=s.replace(marker,inject+marker,1)
           p.write_text(s,encoding='utf-8')
           PY
@@ -56,6 +59,10 @@ jobs:
           ! grep -q '<datalist' www/index.html
           ! grep -q 'aero-role-presets' www/index.html
           grep -q 'aero-role-suggestions' www/index.html
+          test "$(grep -o 'id="aero-script-modes"' www/index.html | wc -l | tr -d ' ')" = "1"
+          grep -q 'data-mode="auto"' www/index.html
+          grep -q 'data-mode="ai"' www/index.html
+          grep -q 'data-mode="local"' www/index.html
           grep -q 'data-mode="auto"' www/script-modes.js
           grep -q 'data-mode="ai"' www/script-modes.js
           grep -q 'data-mode="local"' www/script-modes.js
@@ -64,7 +71,10 @@ jobs:
           grep -q 'b.disabled=false' www/script-modes.js
           ! grep -q 'b.disabled=!!on' www/script-modes.js
           ! grep -q 'addRolePresets' www/script-modes.js
-          echo 'v77 QA: PASS'
+          ! grep -q '#apply-btn' www/script-modes.js
+          grep -q 'abortActive' www/script-modes.js
+          grep -q 'v77.2' www/aero-runtime-fix.js
+          echo 'v77 source QA: PASS'
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -83,6 +93,28 @@ jobs:
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
+      - name: QA packaged APK
+        run: |
+          set -e
+          rm -rf /tmp/apkqa
+          mkdir -p /tmp/apkqa
+          unzip -q android/app/build/outputs/apk/debug/app-debug.apk -d /tmp/apkqa
+          PUB=/tmp/apkqa/assets/public
+          test -f "$PUB/index.html"
+          test -f "$PUB/script-modes.js"
+          test -f "$PUB/aero-runtime-fix.js"
+          test "$(grep -o 'id="aero-script-modes"' "$PUB/index.html" | wc -l | tr -d ' ')" = "1"
+          grep -q 'AUTO / SMART' "$PUB/index.html"
+          grep -q 'AI TAILOR' "$PUB/index.html"
+          grep -q 'ORIGINAL / LOCAL' "$PUB/index.html"
+          ! grep -q 'id="apply-btn"' "$PUB/index.html"
+          ! grep -q '<datalist' "$PUB/index.html"
+          ! grep -q 'aero-role-presets' "$PUB/index.html"
+          grep -q 'v77.2' "$PUB/aero-runtime-fix.js"
+          grep -q 'applyReplacementsToStyledBaseline' "$PUB/script-modes.js"
+          ! grep -q '#apply-btn' "$PUB/script-modes.js"
+          grep -q 'abortActive' "$PUB/script-modes.js"
+          echo 'PACKAGED APK QA: PASS'
       - name: Fast AI tailoring smoke test
         continue-on-error: false
         run: |
